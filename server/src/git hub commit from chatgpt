@@ -1,0 +1,34 @@
+Add clients UI and API integration with PostgreSQL backend
+### Overview
+This update integrates the frontend client management UI with the backend API and PostgreSQL database. It also introduces a lightweight CORS configuration for local development to allow smooth interaction between the client (port 8080) and the Express API (port 5000).
+
+### Changes Implemented
+- **Frontend (client/index.html)**
+  - Added form to create and list clients.
+  - Updated API base URL to point to backend service (http://localhost:5000/api).
+  - Improved client table rendering and error handling.
+
+- **Backend (server/src)**
+  - Implemented `GET /api/clients` and `POST /api/clients` endpoints.
+  - Connected Express backend to PostgreSQL using the `pg` Pool.
+  - Added `server/src/db.js` for DB connection configuration.
+  - Enabled simple CORS middleware for local development in `index.js`.
+  - Dockerfile and Compose setup updated to include PostgreSQL container and persistent data volume.
+
+- **Docker Configuration**
+  - Added `docker-compose.yml` to manage server, client, and database services.
+  - Verified container networking and local database initialization.
+
+### Testing
+- Verified server and database connectivity using:
+  - `curl http://localhost:5000/api/clients`
+  - Frontend form submission at `http://localhost:8080/`
+- Confirmed successful client record insertion and retrieval.
+
+### Next Steps
+- Add PUT/DELETE endpoints for client management.
+- Secure CORS configuration for production.
+- Integrate authentication and improved error handling.
+
+---
+✅ **Result:** Full client creation and listing now functional from the SmartHome web UI, backed by PostgreSQL.
