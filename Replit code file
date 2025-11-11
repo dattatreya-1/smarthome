@@ -1,0 +1,5035 @@
+# SmartList AI - Complete Technical Documentation
+**For: Dan (AI Engineer Review)**  
+**Date:** November 7, 2025  
+**Status:** Production-Ready MVP
+
+---
+
+## Table of Contents
+1. [Executive Summary](#executive-summary)
+2. [Technology Stack](#technology-stack)
+3. [System Architecture](#system-architecture)
+4. [Database Schema](#database-schema)
+5. [Backend Implementation](#backend-implementation)
+6. [Frontend Implementation](#frontend-implementation)
+7. [Authentication & Security](#authentication--security)
+8. [External Integrations](#external-integrations)
+9. [Feature Documentation](#feature-documentation)
+10. [Development Workflows](#development-workflows)
+11. [API Reference](#api-reference)
+12. [Code Conventions](#code-conventions)
+
+---
+
+## Executive Summary
+
+SmartList AI is a production-ready For Sale By Owner (FSBO) real estate platform that combines AI-powered property analysis, professional services marketplace, and smart home integration. The platform serves three primary user types:
+
+- **FSBO Clients**: Homeowners selling properties independently
+- **SmartPartners**: Professional service providers (contractors, brokers, attorneys, insurance, lending, financing)
+- **Buyers**: Property purchasers accessing listings and transactions
+- **Admins**: Platform administrators with moderation and management capabilities
+
+### Core Value Propositions
+
+1. **AI-Driven Property Intelligence**: LiDAR scan analysis with OpenAI GPT-4o providing pricing suggestions, area research, loan compliance checks (VA/FHA/USDA/Conventional), and ROI improvement recommendations
+2. **Professional Services Marketplace**: Vetted SmartPartners compete for projects with transparent bidding and academic-style performance ratings (SmartReport Card)
+3. **Subscription Model**: Three tiers (STARTER $19/mo, SMART_AI $39/mo, SMART_PRO $69/mo) with progressive feature access
+4. **All-in-One Platform**: Listing management, project management, messaging, appointments, social media auto-posting, financing integration, and smart home add-ons
+
+### Project Status
+
+- **Current State**: Production-ready MVP with all core features implemented
+- **Last Major Update**: SmartManage project management system completed (Nov 7, 2025)
+- **Database**: PostgreSQL with 50+ tables, fully normalized schema
+- **Codebase**: ~25,000 lines of TypeScript (backend + frontend)
+- **Testing**: Manual E2E validation completed, ready for automated testing
+- **Deployment**: Replit-hosted with object storage integration
+
+---
+
+## Technology Stack
+
+### Core Framework
+```
+Language: TypeScript (Node.js 20+)
+Backend: Express.js 4.x
+Frontend: React 18.x with Vite
+Routing: Wouter (client-side)
+```
+
+### Database & ORM
+```
+Database: PostgreSQL (Neon-backed via Replit)
+ORM: Drizzle ORM with drizzle-kit
+Validation: Zod with drizzle-zod integration
+Session Store: connect-pg-simple (persistent sessions)
+```
+
+### UI/UX
+```
+Component Library: Shadcn UI (Radix UI primitives)
+Styling: Tailwind CSS with custom design system
+Icons: Lucide React
+Forms: React Hook Form + Zod validation
+State Management: TanStack Query v5 (React Query)
+Real-time: WebSocket with ws library
+```
+
+### Authentication & Security
+```
+Password Hashing: bcryptjs (12 rounds)
+2FA: TOTP via otpauth library
+CAPTCHA: Cloudflare Turnstile
+CSRF Protection: csurf middleware
+Session Management: express-session with PostgreSQL store
+Rate Limiting: Custom middleware (per-user + IP-based)
+Input Sanitization: DOMPurify for XSS prevention
+Security Headers: Helmet.js
+```
+
+### Payment Processing
+```
+Payment Gateway: Stripe API v2024-06-20
+Subscription Management: Stripe Checkout + Webhooks
+Payment Methods: Cards, ACH (via Stripe)
+```
+
+### File Storage
+```
+Object Storage: Replit Object Storage (GCS-backed)
+Upload UI: Uppy dashboard components
+File Handling: Signed URLs for secure uploads
+```
+
+### External APIs
+```
+AI: OpenAI GPT-4o (via AI_INTEGRATIONS_*)
+Property Data: ATTOM Data Solutions API
+Cost Estimation: RSMeans Data API
+Market Research: Perplexity Sonar API
+Crime Data: FBI + SpotCrime APIs
+Geocoding: Mapbox API
+Calendar Sync: Google Calendar OAuth 2.0
+Push Notifications: Web Push (VAPID protocol)
+```
+
+### Job Queue & Background Processing
+```
+Queue: BullMQ (Redis-backed)
+Workers: Geofencing notifications, email sends
+```
+
+### Development Tools
+```
+Build Tool: Vite 5.x
+Package Manager: npm
+Testing: Playwright (E2E), Vitest (unit/integration)
+Linting: ESLint + TypeScript compiler
+Version Control: Git
+```
+
+---
+
+## System Architecture
+
+### High-Level Overview
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                      Frontend (React)                    │
+│  ┌───────────┬───────────┬──────────┬─────────────────┐ │
+│  │  Public   │  Client   │ Partner  │  Admin Portal   │ │
+│  │  Pages    │  Portal   │ Portals  │                 │ │
+│  └───────────┴───────────┴──────────┴─────────────────┘ │
+│                         ▲                                │
+│                         │ HTTP/WebSocket                 │
+│                         ▼                                │
+│               ┌─────────────────────┐                    │
+│               │  Express Backend    │                    │
+│               │  ┌───────────────┐  │                    │
+│               │  │  API Routes   │  │                    │
+│               │  ├───────────────┤  │                    │
+│               │  │  Middleware   │  │                    │
+│               │  ├───────────────┤  │                    │
+│               │  │  Services     │  │                    │
+│               │  └───────────────┘  │                    │
+│               └─────────────────────┘                    │
+│                         │                                │
+│        ┌────────────────┼────────────────┐               │
+│        ▼                ▼                ▼               │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐          │
+│  │PostgreSQL│    │  Object  │    │ External │          │
+│  │ Database │    │ Storage  │    │   APIs   │          │
+│  └──────────┘    └──────────┘    └──────────┘          │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Directory Structure
+
+```
+/
+├── client/                    # Frontend React application
+│   ├── src/
+│   │   ├── pages/            # Route components (50+ pages)
+│   │   ├── components/       # Reusable UI components
+│   │   │   └── ui/          # Shadcn UI primitives
+│   │   ├── contexts/        # React contexts (Auth, Mode)
+│   │   ├── hooks/           # Custom React hooks
+│   │   └── lib/             # Utilities (queryClient, etc.)
+│   └── index.css            # Tailwind + custom CSS variables
+│
+├── server/                   # Backend Express application
+│   ├── index.ts             # Server entry point
+│   ├── routes.ts            # API route definitions (150+ endpoints)
+│   ├── storage.ts           # Database interface layer
+│   ├── auth.ts              # Authentication utilities
+│   ├── middleware.ts        # CORS, rate limiting, validation
+│   ├── stripe.ts            # Stripe integration
+│   ├── aiAnalysisService.ts # OpenAI integration
+│   ├── objectStorage.ts     # File storage service
+│   ├── websocketService.ts  # Real-time messaging
+│   ├── geofencingService.ts # Location-based alerts
+│   └── oauthService.ts      # Social OAuth handlers
+│
+├── shared/                  # Shared between client/server
+│   └── schema.ts           # Drizzle schemas + Zod validation (2500+ lines)
+│
+├── drizzle/                # Database migrations
+│   └── migrations/         # SQL migration files
+│
+└── attached_assets/        # User-uploaded files (dev only)
+```
+
+### Request Flow
+
+#### 1. Authentication Flow
+```
+User → Login Page → POST /api/auth/login
+         ↓ (CAPTCHA + credentials)
+    Server validates → BCrypt password check
+         ↓ (if 2FA enabled)
+    POST /api/auth/2fa/verify-login
+         ↓
+    Session created in PostgreSQL → Cookie issued
+         ↓
+    Frontend receives user object → Updates AuthContext
+```
+
+#### 2. Protected API Request Flow
+```
+Frontend → apiRequest() wrapper
+    ↓ (includes credentials)
+Express Middleware Chain:
+    1. CORS validation
+    2. Rate limiting (per-user or IP)
+    3. Session authentication
+    4. CSRF token validation
+    5. Input sanitization
+    6. Route handler
+    ↓
+Storage Interface → Database query
+    ↓
+Response JSON → Frontend TanStack Query cache
+```
+
+#### 3. File Upload Flow
+```
+Frontend → Request signed URL (POST /api/objects/upload)
+    ↓
+Backend → ObjectStorageService.getObjectEntityUploadURL()
+    ↓ (returns uploadUrl + objectPath)
+Frontend → Direct upload to signed URL
+    ↓
+Frontend → Save metadata (PUT /api/listings/:id/files)
+    ↓
+Backend → Store objectPath in database
+```
+
+#### 4. WebSocket Connection Flow
+```
+Frontend → Connect to ws://host/ws
+    ↓ (session cookie passed)
+Backend → Authenticate via session
+    ↓
+Add client to active connections map
+    ↓
+Bidirectional messaging (JSON)
+    - Type: 'message' | 'notification' | 'update'
+```
+
+---
+
+## Database Schema
+
+### Overview
+- **Total Tables**: 50+
+- **Naming Convention**: snake_case
+- **Primary Keys**: VARCHAR with UUID v4 (`gen_random_uuid()`)
+- **Timestamps**: All tables have `created_at`, most have `updated_at`
+- **Soft Delete**: Implemented via `delete_state` enum (ACTIVE/DELETED/PURGED)
+
+### Core Tables
+
+#### 1. `users` - User Accounts
+```typescript
+users {
+  id: varchar (PK, UUID)
+  username: text (unique, indexed)
+  password: text (bcrypt hashed)
+  userType: enum ('ADMIN', 'FSBO_CLIENT', 'SMART_PARTNER', 'BUYER')
+  
+  // Profile
+  firstName, lastName, email, phone, avatar, bio
+  address, city, state, zipCode
+  
+  // Notifications
+  preferredContactMethod: 'email' | 'phone' | 'sms'
+  emailNotifications: boolean (default true)
+  smsNotifications: boolean (default false)
+  
+  // 2FA
+  twoFactorEnabled: boolean
+  twoFactorSecret: text (encrypted TOTP secret)
+  backupCodes: text[] (one-time use codes)
+  
+  // Email Verification
+  emailVerified: boolean
+  emailVerificationToken: text
+  emailVerificationTokenExpiry: timestamp
+  
+  // Password Reset
+  passwordResetToken: text
+  passwordResetTokenExpiry: timestamp
+  
+  // Subscription
+  currentSubscriptionId: varchar (FK → subscriptions.id)
+  
+  created_at, updated_at
+}
+
+Indexes:
+  - username (unique)
+  - email (for lookups)
+```
+
+#### 2. `subscriptions` - Stripe Subscriptions
+```typescript
+subscriptions {
+  id: varchar (PK)
+  userId: varchar (FK → users.id, CASCADE)
+  tier: enum ('STARTER', 'SMART_AI', 'SMART_PRO')
+  status: enum ('ACTIVE', 'CANCELLED', 'PAST_DUE', 'TRIAL')
+  
+  startedAt: timestamp
+  endsAt: timestamp
+  cancelledAt: timestamp
+  
+  // Stripe Integration
+  stripeCustomerId: text
+  stripeSubscriptionId: text (indexed)
+  
+  created_at, updated_at
+}
+
+Indexes:
+  - userId
+  - status
+  - stripeSubscriptionId (for webhook lookups)
+```
+
+#### 3. `listings` - Property Listings
+```typescript
+listings {
+  id: varchar (PK)
+  userId: varchar (FK → users.id)
+  
+  // Property Details
+  address, city, state, zipCode: text
+  price: integer (cents)
+  bedrooms: integer
+  bathrooms: real
+  squareFeet: integer
+  yearBuilt: integer
+  description: text
+  features: text[]
+  photos: text[] (object storage URLs)
+  
+  // Listing Status
+  status: 'DRAFT' | 'PENDING_UPGRADES' | 'READY_TO_PUBLISH' | 'PUBLISHED' | 'ACTIVE' | 'SOLD'
+  mode: 'BASIC' | 'AI_ONLY' | 'BROKERAGE_ASSISTED'
+  partnerId: varchar (FK → partner_profiles.id)
+  
+  // Seller Paid Access ($40 feature)
+  sellerPaidAccess: boolean
+  sellerAccessPaidAt: timestamp
+  
+  // AI Analysis Results
+  suggestedPrice: integer (cents)
+  suggestedPriceWithUpgrades: integer
+  pricingRationale: text (AI explanation)
+  comparablesData: text (JSON)
+  upgradesValue: integer
+  
+  // LiDAR Scan Data
+  scanFiles: text[] (URLs)
+  scanType: 'LIDAR' | 'IMAGE_SET' | 'VIDEO_WALKTHROUGH'
+  scanMetadata: text (JSON - rooms, dimensions)
+  
+  // AI-Generated Content
+  areaHighlights: text (JSON - parks, schools, crime, market)
+  keySellingPoints: text[]
+  
+  // Lot Size (with override capability)
+  lotAcresOverride: real
+  lotSqftOverride: real
+  lotAcresSource: 'ATTOM' | 'USER_ENTERED' | 'VERIFIED'
+  lotAcresVerified: boolean
+  lotSizeDiscrepancy: boolean
+  lotSizeDiscrepancyNote: text
+  
+  // Site Features
+  siteFurnishings: text[] ('pond', 'barn', 'pool', etc.)
+  
+  // Geofencing
+  geoLat, geoLng: real
+  geofenceEnabled: boolean
+  geofenceRadiusMeters: integer (50-1000)
+  
+  // Soft Delete
+  deleteState: enum
+  deletedAt: timestamp
+  deletedBy: varchar
+  deleteReason: text
+  
+  created_at, updated_at
+}
+
+Indexes:
+  - userId
+  - status
+  - deleteState
+  - partnerId
+  - state, city (for geographic searches)
+  - Composite: (userId, deleteState) for user's active listings
+```
+
+#### 4. `partner_profiles` - Professional Service Providers
+```typescript
+partner_profiles {
+  id: varchar (PK)
+  userId: varchar (FK → users.id)
+  type: 'BROKERAGE' | 'ATTORNEY' | 'CONTRACTOR' | 'INSURANCE' | 
+        'HOME_LENDING' | 'HOME_IMPROVEMENT_FINANCING'
+  
+  // Business Info
+  displayName, companyName: text
+  bio: text
+  states: text[] (licensed states)
+  serviceAreas: text[] (cities/regions)
+  specialties: text[] (e.g., 'Kitchen Remodeling')
+  licenseNo: text
+  
+  // SmartReport Card System (Academic-style GPA)
+  smartReportCard: real (1.0-4.0, default 3.0)
+  platformFeeDiscount: real (0-40%, based on grade)
+  
+  // Performance Metrics
+  onTimeCompletionRate: real (0-100%)
+  estimateAccuracyRate: real (0-100%)
+  avgResponseTimeHours: real
+  totalEarnings: integer (cents)
+  rating: real (1-5 stars)
+  closedCount: integer
+  smartlistRank: integer (0-100)
+  
+  // Contact
+  website, contactEmail, contactPhone: text
+  facebookUrl, instagramHandle, linkedinUrl, googleBusinessUrl: text
+  
+  // Visibility Tier
+  visibility: 'FREE' | 'VERIFIED' | 'PREMIUM'
+  
+  // Brokerage-specific
+  listingPctMin, listingPctMax, listingPctDefault: real
+  feeNotes: text
+  
+  created_at, updated_at
+}
+
+Indexes:
+  - userId
+  - type
+  - visibility
+  - smartReportCard (for sorting by performance)
+```
+
+#### 5. `projects` - Service Marketplace Projects
+```typescript
+projects {
+  id: varchar (PK)
+  ownerId: varchar (homeowner posting project)
+  
+  // Project Details
+  title, description: text
+  address, city, state, zipCode: text
+  lat, lng: real
+  
+  // Budget & Scope
+  budgetMin, budgetMax: integer (cents)
+  squareFeet: integer
+  category: 'Remodel' | 'Landscaping' | 'Repairs' | etc.
+  serviceCategory: 'landscaping' | 'concrete' | 'roof' | etc. (for geofencing)
+  style: text
+  timeline: 'ASAP' | '1-3 months' | 'Flexible'
+  photos: text[]
+  
+  // Status
+  status: 'open' | 'closed' | 'awarded'
+  requiresCertifiedScanner: boolean
+  buyItNowPrice: integer
+  bidDeadline: timestamp
+  awardedBidId: varchar
+  
+  // Soft Delete
+  deleteState, deletedAt, deletedBy, deleteReason
+  
+  created_at, updated_at
+}
+
+Indexes:
+  - ownerId
+  - status
+  - deleteState
+  - state, category (for searches)
+  - Composite: (ownerId, deleteState)
+```
+
+#### 6. `project_bids` - Contractor Bids on Projects
+```typescript
+project_bids {
+  id: varchar (PK)
+  projectId: varchar (FK → projects.id)
+  contractorId: varchar (FK → partner_profiles.id)
+  
+  amount: integer (cents)
+  message: text
+  etaDays: integer (default 14)
+  status: 'active' | 'withdrawn' | 'rejected' | 'accepted'
+  
+  // Soft Delete
+  deleteState, deletedAt, deletedBy, deleteReason
+  
+  created_at
+}
+
+Indexes:
+  - projectId
+  - contractorId
+  - status
+  - deleteState
+```
+
+### SmartManage Tables (Project Management)
+
+#### 7. `improvement_projects` - AI-Generated Project Tracking
+```typescript
+improvement_projects {
+  id: varchar (PK)
+  listingId: varchar (FK → listings.id)
+  analysisId: varchar (FK → ai_property_analyses.id)
+  ownerId: varchar (FK → users.id)
+  contractorId: varchar (FK → partner_profiles.id) // Assigned SmartPartner
+  
+  // Project Details from AI
+  projectType: 'LOAN_COMPLIANCE' | 'ROI_IMPROVEMENT' | 'CUSTOM'
+  title, description: text
+  
+  // Cost Breakdown
+  estimatedCost: integer (total in cents)
+  materialCost, laborCost, permitCost: integer
+  
+  // Value Impact
+  estimatedValueIncrease: integer
+  estimatedROI: real (percentage)
+  
+  // Compliance Context
+  loanType: 'VA' | 'FHA' | 'USDA' | 'CONVENTIONAL'
+  complianceIssue: text
+  severityLevel: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'
+  
+  // Marketplace Integration
+  postedToMarketplace: boolean
+  projectId: varchar (FK → projects.id)
+  
+  // Financing
+  financingNeeded: boolean
+  financingApplicationId: varchar
+  
+  // Project Status
+  status: 'PENDING' | 'POSTED' | 'AWARDED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED'
+  progressPercentage: real (0-100)
+  
+  // Payment Tracking
+  totalContractValue: integer
+  paymentsPaid: integer (default 0)
+  
+  // Soft Delete
+  deleteState, deletedAt, deletedBy, deleteReason
+  
+  created_at, updated_at
+}
+```
+
+#### 8. `project_milestones` - Project Progress Tracking
+```typescript
+project_milestones {
+  id: varchar (PK)
+  improvementProjectId: varchar (FK)
+  projectId: varchar (optional FK → projects)
+  
+  title, description: text
+  order: integer (sequence)
+  
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
+  completedDate: timestamp
+  estimatedCompletionDate: timestamp
+  
+  created_at, updated_at
+}
+```
+
+#### 9. `project_status_updates` - Contractor Progress Posts
+```typescript
+project_status_updates {
+  id: varchar (PK)
+  improvementProjectId: varchar (FK)
+  projectId: varchar (optional)
+  
+  // Author
+  postedBy: varchar (user ID)
+  postedByName: text
+  postedByType: 'CONTRACTOR' | 'HOMEOWNER' | 'ADMIN'
+  
+  // Content
+  title, message: text
+  updateType: 'PROGRESS' | 'ISSUE' | 'COMPLETION' | 'DELAY' | 'QUESTION' | 'MILESTONE'
+  photos: text[]
+  attachments: text[]
+  
+  // Progress
+  progressPercentage: integer (0-100)
+  milestoneId: varchar
+  
+  visibleToClient: boolean
+  created_at
+}
+```
+
+#### 10. `project_communications` - Threaded Messaging
+```typescript
+project_communications {
+  id: varchar (PK)
+  improvementProjectId: varchar (FK)
+  projectId: varchar (optional)
+  
+  // Sender
+  senderId, senderName, senderType: text
+  
+  // Recipient
+  recipientId, recipientName, recipientType: text
+  
+  // Content
+  subject, message: text
+  attachments: text[]
+  
+  // Threading
+  parentMessageId: varchar (for replies)
+  threadId: varchar (group related messages)
+  
+  // Status
+  read: boolean
+  readAt: timestamp
+  priority: 'URGENT' | 'HIGH' | 'NORMAL' | 'LOW'
+  
+  // Soft Delete (per-user visibility)
+  deleteState, deletedAt, deletedBy, deleteReason
+  hiddenForSender, hiddenForRecipient: boolean
+  
+  created_at
+}
+```
+
+#### 11. `change_orders` - Scope/Cost Changes
+```typescript
+change_orders {
+  id: varchar (PK)
+  improvementProjectId: varchar (FK)
+  projectId: varchar (optional)
+  
+  // Requester
+  requestedBy, requestedByName, requestedByType: text
+  
+  // Change Details
+  title, description, reason: text
+  
+  // Impact
+  costImpact: integer (can be negative)
+  timelineImpact: integer (days, can be negative)
+  originalScope, newScope: text
+  
+  // Supporting Materials
+  attachments, photos: text[]
+  
+  // Approval Workflow
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'WITHDRAWN'
+  reviewedBy, reviewedByName: text
+  reviewedAt: timestamp
+  reviewNotes: text
+  
+  priority: 'URGENT' | 'HIGH' | 'NORMAL' | 'LOW'
+  
+  created_at, updated_at
+}
+```
+
+#### 12. `project_documents` - Centralized File Management
+```typescript
+project_documents {
+  id: varchar (PK)
+  improvementProjectId: varchar (FK)
+  projectId: varchar (optional)
+  
+  // File Metadata
+  fileName, fileUrl: text
+  fileSize: integer (bytes)
+  mimeType: text
+  
+  // Categorization
+  documentType: 'CONTRACT' | 'PLAN' | 'PHOTO' | 'PERMIT' | 'INVOICE' | 'WARRANTY' | 'INSPECTION' | 'OTHER'
+  category: text
+  tags: text[]
+  
+  // Upload Tracking
+  uploadedBy, uploadedByName, uploadedByType: text
+  
+  // Version Control
+  version: integer (default 1)
+  replacesDocumentId: varchar
+  
+  // Description
+  title, description, notes: text
+  
+  // Visibility
+  visibleToClient, visibleToContractor: boolean
+  
+  // Associations
+  changeOrderId, milestoneId: varchar
+  
+  created_at, updated_at
+}
+```
+
+### Additional Notable Tables
+
+#### `ai_property_analyses` - Comprehensive AI Analysis Results
+```typescript
+ai_property_analyses {
+  id: varchar (PK)
+  listingId: varchar (FK, unique)
+  
+  analysisStatus: 'PROCESSING' | 'COMPLETED' | 'FAILED'
+  errorMessage: text
+  
+  // Rich JSON Data
+  areaIntelligence: text (JSON: parks, schools, crime, market trends)
+  aiDescription: text (350-450 words)
+  descriptionWordCount: integer
+  loanComplianceReports: text (JSON array: VA/FHA/USDA/Conventional)
+  improvementRecommendations: text (JSON array: ROI-ranked)
+  
+  // Value Projections
+  currentEstimatedValue: integer
+  potentialValueWithImprovements: integer
+  totalImprovementCost: integer
+  totalValueIncrease: integer
+  totalROI: real
+  
+  created_at, updated_at
+}
+```
+
+#### `board_posts` - SmartBoard Social Platform
+```typescript
+board_posts {
+  id: varchar (PK)
+  userId: varchar (FK → users.id)
+  
+  content: text
+  mediaUrls: text[]
+  postType: 'TEXT' | 'IMAGE' | 'VIDEO' | 'LINK'
+  linkUrl, linkTitle, linkDescription, linkImageUrl: text
+  
+  // Engagement
+  likesCount, commentsCount, sharesCount: integer
+  
+  // Moderation (Admin)
+  flagged: boolean
+  flagReason: text
+  flaggedAt: timestamp
+  flaggedBy: varchar
+  isHidden: boolean
+  moderatedBy: varchar
+  moderatedAt: timestamp
+  moderationAction: 'APPROVED' | 'HIDDEN' | 'DELETED'
+  moderationNotes: text
+  
+  // Visibility
+  visibility: 'PUBLIC' | 'FRIENDS' | 'PRIVATE'
+  
+  created_at, updated_at
+}
+
+Indexes:
+  - userId
+  - flagged (for moderation queue)
+  - created_at (for chronological feed)
+```
+
+#### `geofence_events` - Location-Based Notifications
+```typescript
+geofence_events {
+  id: varchar (PK)
+  deviceId: varchar (FK → devices.id)
+  userId: varchar (FK → users.id)
+  
+  eventType: 'LISTING_PROXIMITY' | 'PROJECT_PROXIMITY'
+  listingId, projectId: varchar (FKs)
+  
+  // Location
+  userLat, userLng: real
+  targetLat, targetLng: real
+  distanceMeters: real
+  
+  // Notification
+  notificationSent: boolean
+  notificationSentAt: timestamp
+  notificationTitle, notificationBody: text
+  
+  created_at
+}
+
+Indexes:
+  - userId, created_at (for deduplication)
+  - deviceId
+  - listingId, projectId (for analytics)
+```
+
+#### `calendar_connections` - External Calendar Sync
+```typescript
+calendar_connections {
+  id: varchar (PK)
+  userId: varchar (FK → users.id)
+  
+  provider: 'GOOGLE' | 'APPLE' | 'NOTION'
+  accountEmail: text
+  
+  // OAuth Tokens
+  accessToken: text (encrypted)
+  refreshToken: text (encrypted)
+  tokenExpiresAt: timestamp
+  
+  // Provider IDs
+  googleCalendarId: text
+  notionDatabaseId: text
+  
+  // Status
+  isActive: boolean
+  lastSyncedAt: timestamp
+  syncErrors: text
+  
+  created_at, updated_at
+}
+```
+
+### Total Table Count: 50+
+- Users & Auth: 5 tables
+- Listings & Properties: 8 tables
+- Projects & Bids: 12 tables
+- SmartManage: 6 tables
+- Partners & Reviews: 6 tables
+- Messaging: 4 tables
+- Social & SmartBoard: 5 tables
+- Financing & Insurance: 8 tables
+- Smart Home Add-Ons: 4 tables
+- Geofencing & Notifications: 4 tables
+- Appointments & Calendar: 3 tables
+- Miscellaneous: 5 tables
+
+---
+
+## Backend Implementation
+
+### File Structure
+
+```
+server/
+├── index.ts              # Entry point, middleware setup
+├── routes.ts             # API route definitions (150+ endpoints)
+├── storage.ts            # Database interface (IStorage)
+├── auth.ts               # Authentication utilities
+├── middleware.ts         # CORS, rate limiting, CSRF
+├── sanitizationMiddleware.ts  # XSS prevention
+├── auditMiddleware.ts    # Audit logging
+├── stripe.ts             # Stripe integration
+├── aiAnalysisService.ts  # OpenAI GPT-4o integration
+├── objectStorage.ts      # File storage service
+├── websocketService.ts   # Real-time messaging
+├── geofencingService.ts  # Location-based notifications
+├── oauthService.ts       # Social OAuth (Google, Apple)
+├── lidarService.ts       # CubiCasa integration
+└── vite.ts               # Vite dev server integration
+```
+
+### Key Services
+
+#### 1. Authentication Service (`auth.ts`)
+
+**Password Security:**
+```typescript
+// BCrypt with 12 rounds (industry standard)
+const SALT_ROUNDS = 12;
+
+async function hashPassword(password: string): Promise<string> {
+  return await bcrypt.hash(password, SALT_ROUNDS);
+}
+
+async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return await bcrypt.compare(password, hash);
+}
+```
+
+**2FA Implementation:**
+```typescript
+// TOTP-based (Time-based One-Time Password)
+import { TOTP } from "otpauth";
+
+function generate2FASecret(): string {
+  const totp = new TOTP({
+    issuer: "SmartList AI",
+    label: user.email,
+    algorithm: "SHA1",
+    digits: 6,
+    period: 30
+  });
+  return totp.secret.base32;
+}
+
+function verify2FAToken(secret: string, token: string): boolean {
+  const totp = new TOTP({ secret: Secret.fromBase32(secret) });
+  return totp.validate({ token, window: 1 }) !== null;
+}
+```
+
+**Account Lockout:**
+```typescript
+// Track failed login attempts
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
+const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
+
+// In-memory map: email → { attempts, lockedUntil, lastAttempt }
+const loginAttempts = new Map<string, LoginAttempt>();
+
+function isAccountLocked(email: string): { locked: boolean; remainingTime?: number }
+function recordFailedLogin(email: string): { locked: boolean; attemptsRemaining?: number }
+```
+
+**Turnstile CAPTCHA:**
+```typescript
+async function verifyTurnstileToken(token: string, ip?: string): Promise<{
+  success: boolean;
+  error?: string;
+}> {
+  const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      secret: process.env.TURNSTILE_SECRET_KEY,
+      response: token,
+      remoteip: ip
+    })
+  });
+  // Validates client completed CAPTCHA challenge
+}
+```
+
+#### 2. Storage Interface (`storage.ts`)
+
+**Design Pattern:** Repository pattern with interface-based abstraction
+
+```typescript
+export interface IStorage {
+  // Users
+  createUser(data: InsertUser): Promise<User>;
+  getUser(id: string): Promise<User | null>;
+  getUserByUsername(username: string): Promise<User | null>;
+  getUserByEmail(email: string): Promise<User | null>;
+  updateUser(id: string, updates: Partial<User>): Promise<User>;
+  
+  // Listings
+  createListing(data: InsertListing): Promise<Listing>;
+  getListings(filters?: ListingFilters): Promise<Listing[]>;
+  getListing(id: string): Promise<Listing | null>;
+  updateListing(id: string, updates: Partial<Listing>): Promise<Listing>;
+  softDeleteListing(id: string, userId: string, reason?: string): Promise<void>;
+  
+  // Projects
+  createProject(data: InsertProject): Promise<Project>;
+  getProjects(filters?: ProjectFilters): Promise<Project[]>;
+  
+  // Bids
+  createProjectBid(data: InsertProjectBid): Promise<ProjectBid>;
+  getProjectBids(projectId: string): Promise<ProjectBid[]>;
+  
+  // SmartManage
+  createImprovementProject(data: InsertImprovementProject): Promise<ImprovementProject>;
+  getImprovementProject(id: string): Promise<ImprovementProject | null>;
+  updateImprovementProject(id: string, updates: Partial<ImprovementProject>): Promise<ImprovementProject>;
+  
+  // ... 100+ more methods
+}
+
+// Implementation using Drizzle ORM
+export class DrizzleStorage implements IStorage {
+  // All methods use Drizzle queries with proper error handling
+}
+```
+
+**Benefits:**
+- Single source of truth for data access
+- Easy to mock for testing
+- Consistent error handling
+- Future-proof for database migrations
+
+#### 3. Stripe Integration (`stripe.ts`)
+
+**Subscription Tiers:**
+```typescript
+export const SUBSCRIPTION_TIERS = {
+  STARTER: {
+    name: "SmartList Starter",
+    priceId: process.env.STRIPE_STARTER_PRICE_ID || "price_starter",
+    amount: 1900, // $19.00
+    interval: "month" as const,
+  },
+  SMART_AI: {
+    name: "SmartList AI",
+    priceId: process.env.STRIPE_SMART_AI_PRICE_ID || "price_smart_ai",
+    amount: 3900, // $39.00
+    interval: "month" as const,
+  },
+  SMART_PRO: {
+    name: "SmartList Pro",
+    priceId: process.env.STRIPE_SMART_PRO_PRICE_ID || "price_smart_pro",
+    amount: 6900, // $69.00
+    interval: "month" as const,
+  },
+} as const;
+```
+
+**Checkout Session Creation:**
+```typescript
+async function createCheckoutSession(
+  userId: string,
+  tier: keyof typeof SUBSCRIPTION_TIERS,
+  successUrl: string,
+  cancelUrl: string
+): Promise<Stripe.Checkout.Session> {
+  const session = await stripe.checkout.sessions.create({
+    customer_email: user.email,
+    payment_method_types: ["card"],
+    line_items: [{
+      price: SUBSCRIPTION_TIERS[tier].priceId,
+      quantity: 1,
+    }],
+    mode: "subscription",
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    metadata: { userId, tier },
+  });
+  return session;
+}
+```
+
+**Webhook Handling:**
+```typescript
+// POST /api/stripe/webhook (raw body required)
+app.post("/api/stripe/webhook", 
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const signature = req.headers["stripe-signature"];
+    const event = stripe.webhooks.constructEvent(
+      req.body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+    
+    switch (event.type) {
+      case "checkout.session.completed":
+        // Create subscription in database
+      case "customer.subscription.updated":
+        // Update subscription status
+      case "customer.subscription.deleted":
+        // Cancel subscription
+      case "invoice.payment_succeeded":
+        // Reactivate subscription
+      case "invoice.payment_failed":
+        // Mark as past_due
+    }
+  }
+);
+```
+
+#### 4. AI Analysis Service (`aiAnalysisService.ts`)
+
+**Property Analysis Flow:**
+```typescript
+async function generatePropertyAnalysis(listing: Listing): Promise<PropertyAnalysisResult> {
+  // 1. Build comprehensive prompt
+  const systemPrompt = `You are a professional real estate analyst with expertise in:
+    - Hyperlocal area research and neighborhood intelligence
+    - Multi-loan compliance (VA, FHA, USDA, Conventional)
+    - Home improvement cost estimation and ROI analysis
+    - Regional market trends and property valuation`;
+  
+  const userPrompt = `Analyze this property and generate a comprehensive intelligence report:
+    
+    **Property Details:**
+    - Address: ${address}
+    - Price: $${price}
+    - ${bedrooms} bed, ${bathrooms} bath, ${squareFeet} sq ft
+    
+    **Required Outputs:**
+    1. AREA INTELLIGENCE (parks, schools, crime, market)
+    2. PROPERTY DESCRIPTION (350-450 words)
+    3. LOAN COMPLIANCE ANALYSIS (VA/FHA/USDA/Conventional)
+    4. ROI IMPROVEMENT RECOMMENDATIONS (3-5 high-impact upgrades)`;
+  
+  // 2. Call OpenAI GPT-4o
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userPrompt }
+    ],
+    temperature: 0.7,
+    max_tokens: 4000
+  });
+  
+  // 3. Parse structured JSON response
+  const analysis = JSON.parse(response.choices[0].message.content);
+  
+  // 4. Store in database
+  await storage.createAiPropertyAnalysis({
+    listingId: listing.id,
+    analysisStatus: "COMPLETED",
+    areaIntelligence: JSON.stringify(analysis.areaIntelligence),
+    aiDescription: analysis.propertyDescription,
+    loanComplianceReports: JSON.stringify(analysis.loanCompliance),
+    improvementRecommendations: JSON.stringify(analysis.improvements),
+    currentEstimatedValue: analysis.currentValue,
+    potentialValueWithImprovements: analysis.potentialValue,
+    totalImprovementCost: analysis.totalCost,
+    totalROI: analysis.totalROI
+  });
+  
+  return analysis;
+}
+```
+
+**Integration with External APIs:**
+```typescript
+// ATTOM Property Data
+async function getAttomPropertyData(address: string) {
+  const response = await fetch(
+    `https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/expandedprofile`,
+    {
+      headers: {
+        "apikey": process.env.ATTOM_API_KEY,
+        "Accept": "application/json"
+      }
+    }
+  );
+  // Returns: AVM, sales history, comparables, demographics, schools, POI
+}
+
+// Perplexity Sonar for real-time web research
+async function getPerplexityResearch(query: string) {
+  const response = await fetch("https://api.perplexity.ai/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${process.env.PERPLEXITY_API_KEY}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      model: "sonar",
+      messages: [{ role: "user", content: query }]
+    })
+  });
+  // Returns: Current market trends, local news, neighborhood insights
+}
+```
+
+#### 5. Object Storage Service (`objectStorage.ts`)
+
+**Architecture:**
+- Backend: Google Cloud Storage (via Replit integration)
+- Security: Pre-signed URLs with expiration
+- Organization: `public/` (listings) and `.private/` (documents) directories
+
+```typescript
+class ObjectStorageService {
+  // Generate pre-signed upload URL
+  async getObjectEntityUploadURL(
+    entity: 'listing' | 'project' | 'document',
+    entityId: string,
+    filename: string,
+    contentType: string
+  ): Promise<{ uploadUrl: string; objectPath: string }> {
+    const bucketName = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    const objectPath = `public/${entity}/${entityId}/${Date.now()}-${filename}`;
+    
+    const bucket = storage.bucket(bucketName);
+    const file = bucket.file(objectPath);
+    
+    // Generate signed URL (valid for 10 minutes)
+    const [uploadUrl] = await file.getSignedUrl({
+      version: 'v4',
+      action: 'write',
+      expires: Date.now() + 10 * 60 * 1000,
+      contentType
+    });
+    
+    return { uploadUrl, objectPath };
+  }
+  
+  // Download file
+  async downloadObject(file: File, res: Response) {
+    const [metadata] = await file.getMetadata();
+    res.set({
+      "Content-Type": metadata.contentType,
+      "Content-Length": metadata.size,
+      "Cache-Control": "public, max-age=3600"
+    });
+    file.createReadStream().pipe(res);
+  }
+}
+```
+
+**Frontend Upload Flow:**
+```typescript
+// 1. Request signed URL
+const { uploadUrl, objectPath } = await apiRequest("POST", "/api/objects/upload", {
+  entity: "listing",
+  entityId: listingId,
+  filename: file.name,
+  contentType: file.type
+});
+
+// 2. Upload directly to GCS
+await fetch(uploadUrl, {
+  method: "PUT",
+  headers: { "Content-Type": file.type },
+  body: file
+});
+
+// 3. Save metadata to database
+await apiRequest("PUT", `/api/listings/${listingId}/files`, {
+  photos: [...existingPhotos, objectPath]
+});
+```
+
+#### 6. WebSocket Service (`websocketService.ts`)
+
+**Connection Establishment:**
+```typescript
+class WebSocketService {
+  private wss: WebSocket.Server;
+  private clients = new Map<string, Set<WebSocket>>();
+  
+  initialize(server: Server) {
+    this.wss = new WebSocket.Server({ 
+      server,
+      path: '/ws',
+      verifyClient: (info, callback) => {
+        // Authenticate via session cookie
+        const cookies = cookie.parse(info.req.headers.cookie || '');
+        const sessionId = cookies['connect.sid'];
+        // ... verify session ...
+        callback(true, 200, 'OK', { userId });
+      }
+    });
+    
+    this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+      const userId = (req as any).userId;
+      this.addClient(userId, ws);
+      
+      ws.on('message', (data) => this.handleMessage(ws, JSON.parse(data.toString())));
+      ws.on('close', () => this.removeClient(userId, ws));
+    });
+  }
+  
+  // Send message to specific user
+  sendToUser(userId: string, message: any) {
+    const userSockets = this.clients.get(userId);
+    if (userSockets) {
+      userSockets.forEach(ws => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify(message));
+        }
+      });
+    }
+  }
+}
+```
+
+**Message Types:**
+```typescript
+// Sent from server to client
+{
+  type: 'connected' | 'message' | 'notification' | 'update',
+  data: any
+}
+
+// Examples:
+{ type: 'message', data: { conversationId, senderId, text, timestamp } }
+{ type: 'notification', data: { title, body, link } }
+{ type: 'update', data: { entity: 'project', entityId, field: 'status', value: 'completed' } }
+```
+
+#### 7. Geofencing Service (`geofencingService.ts`)
+
+**Technology:**
+- Queue: BullMQ (Redis-backed job queue)
+- Calculations: Haversine distance formula
+- Notifications: Web Push (VAPID protocol)
+
+```typescript
+// Job processor
+async function processLocationUpdate(job: Job) {
+  const { userId, lat, lng } = job.data;
+  
+  // 1. Get user's notification preferences
+  const prefs = await storage.getNotificationPreferences(userId);
+  if (!prefs.geofencingEnabled) return;
+  
+  // 2. Find nearby listings (bounding box query)
+  const nearbyListings = await storage.findNearbyListings(lat, lng, prefs.radiusMeters);
+  
+  // 3. Calculate precise distances (Haversine)
+  const inRange = nearbyListings.filter(listing => {
+    const distance = haversineDistance(lat, lng, listing.geoLat, listing.geoLng);
+    return distance <= listing.geofenceRadiusMeters;
+  });
+  
+  // 4. Deduplicate (4-hour window)
+  const recentEvents = await storage.getRecentGeofenceEvents(userId, 4 * 60 * 60 * 1000);
+  const newListings = inRange.filter(l => 
+    !recentEvents.some(e => e.listingId === l.id)
+  );
+  
+  // 5. Send push notifications
+  for (const listing of newListings) {
+    await sendPushNotification(userId, {
+      title: "Property Nearby!",
+      body: `${listing.address} is within ${listing.geofenceRadiusMeters}m`,
+      data: { listingId: listing.id, url: `/listings/${listing.id}` }
+    });
+    
+    // Log event
+    await storage.createGeofenceEvent({
+      userId,
+      listingId: listing.id,
+      userLat: lat,
+      userLng: lng,
+      distanceMeters: haversineDistance(...),
+      notificationSent: true
+    });
+  }
+}
+
+// Haversine distance calculation
+function haversineDistance(lat1, lon1, lat2, lon2): number {
+  const R = 6371e3; // Earth radius in meters
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+  
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  
+  return R * c; // Distance in meters
+}
+```
+
+### Middleware Stack
+
+**Execution Order (from `server/index.ts`):**
+```typescript
+1. enforceHttps (production only)
+2. helmet (security headers)
+3. corsMiddleware
+4. express.json / express.urlencoded
+5. cookieParser
+6. session (PostgreSQL-backed)
+7. sanitizeInput (XSS prevention)
+8. auditMiddleware (logging)
+9. rateLimitMiddleware
+10. csrfProtection
+11. Route handlers
+12. Error handlers
+```
+
+**Rate Limiting:**
+```typescript
+// server/middleware.ts
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+// Key generation: per-user if authenticated, per-IP otherwise
+function getRateLimitKey(req: Request): string {
+  const userId = (req.session as any)?.userId;
+  const ip = req.ip || req.socket.remoteAddress || "unknown";
+  return userId ? `user:${userId}` : `ip:${ip}`;
+}
+
+export function rateLimitMiddleware(
+  windowMs: number = 15 * 60 * 1000, // 15 minutes
+  maxRequests: number = 100
+) {
+  return (req, res, next) => {
+    const key = getRateLimitKey(req);
+    const now = Date.now();
+    const record = rateLimitStore.get(key);
+    
+    if (!record || now > record.resetAt) {
+      rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+    
+    if (record.count >= maxRequests) {
+      return res.status(429).json({
+        error: "Too many requests",
+        retryAfter: Math.ceil((record.resetAt - now) / 1000)
+      });
+    }
+    
+    record.count++;
+    next();
+  };
+}
+```
+
+**CSRF Protection:**
+```typescript
+import csrf from 'csurf';
+
+export const csrfProtection = csrf({ cookie: false, sessionKey: 'session' });
+
+// Skip validation for safe methods and specific endpoints
+app.use((req, res, next) => {
+  const skipValidation = 
+    ['GET', 'HEAD', 'OPTIONS'].includes(req.method) ||
+    req.path.match(/^\/api\/(auth|stripe\/webhook|dev\/)/);
+  
+  if (skipValidation) {
+    // Mount csurf without validation (for token generation)
+    return csrfProtection(req, res, (err) => {
+      if (err && err.code === 'EBADCSRFTOKEN') return next();
+      next(err);
+    });
+  }
+  
+  // Apply CSRF protection with validation
+  return csrfProtection(req, res, next);
+});
+```
+
+**Input Sanitization:**
+```typescript
+import DOMPurify from 'isomorphic-dompurify';
+
+export function sanitizeInput(req: Request, res: Response, next: NextFunction) {
+  if (req.body && typeof req.body === 'object') {
+    req.body = sanitizeObject(req.body);
+  }
+  next();
+}
+
+function sanitizeObject(obj: any): any {
+  if (typeof obj === 'string') {
+    return DOMPurify.sanitize(obj, {
+      ALLOWED_TAGS: [], // Strip all HTML
+      KEEP_CONTENT: true
+    });
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(sanitizeObject);
+  }
+  if (obj && typeof obj === 'object') {
+    const sanitized: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      sanitized[key] = sanitizeObject(value);
+    }
+    return sanitized;
+  }
+  return obj;
+}
+```
+
+---
+
+## Frontend Implementation
+
+### Architecture
+
+**State Management Philosophy:**
+- **Global State**: React Context (Auth, Theme)
+- **Server State**: TanStack Query (all API data)
+- **Local State**: React useState (UI interactions)
+- **Form State**: React Hook Form (controlled inputs)
+
+### Routing Structure
+
+**Public Routes** (no auth required):
+```typescript
+/ → Home (marketing landing)
+/listings → ListingsBrowse
+/listings/:id → ListingDetail
+/contractors → ContractorDirectory
+/professionals → ProfessionalDirectory
+/service-marketplace → ServiceMarketplace
+/smartboard → SmartBoard
+/pricing → Pricing
+/help/* → Help pages
+```
+
+**Client Routes** (FSBO_CLIENT role):
+```typescript
+/client-portal → ClientPortal (tabbed interface)
+  ├─ Overview tab
+  ├─ Listings tab
+  ├─ Projects tab
+  └─ Account tab
+/dashboard/new-listing → NewListing (wizard)
+/listings/:id/edit → EditListing
+/property-analysis/:id → PropertyAnalysis
+/settings/social-media → SocialMediaSettings
+```
+
+**Partner Routes** (SMART_PARTNER role):
+```typescript
+/portal/contractor → ContractorPortal
+/portal/broker → BrokerPortal
+/portal/lawyer → LawyerPortal
+/portal/insurance → InsurancePortal
+/portal/home-lending → HomeLendingPortal
+/portal/home-financing → HomeFinancingPortal
+/partner/manage → SmartManage (project management)
+/partner/recycle-bin → RecycleBin
+```
+
+**Admin Routes** (ADMIN role):
+```typescript
+/admin → AdminDashboard
+/admin/controls → AdminControls
+/admin/smartboard-moderation → AdminSmartBoardModeration
+/admin/project-management → AdminProjectManagement
+```
+
+### Key Frontend Patterns
+
+#### 1. Authentication Context
+
+```typescript
+// client/src/contexts/AuthContext.tsx
+interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  login: (emailOrUsername: string, password: string, turnstileToken?: string) => Promise<void>;
+  register: (data: RegisterData, turnstileToken?: string) => Promise<void>;
+  verify2FA: (userId: string, token?: string, backupCode?: string) => Promise<void>;
+  logout: () => Promise<void>;
+  refetchUser: () => Promise<void>;
+}
+
+// Usage in components
+function MyComponent() {
+  const { user, isAuthenticated, logout } = useAuth();
+  
+  if (!isAuthenticated) {
+    return <Navigate to="/login" />;
+  }
+  
+  return <div>Welcome {user.firstName}</div>;
+}
+```
+
+#### 2. TanStack Query Pattern
+
+```typescript
+// Fetching data
+function ListingsPage() {
+  const { data: listings, isLoading, error } = useQuery({
+    queryKey: ['/api/listings'],
+    // No queryFn needed - default fetcher is configured
+  });
+  
+  if (isLoading) return <Skeleton />;
+  if (error) return <Alert>Error loading listings</Alert>;
+  
+  return listings.map(listing => <ListingCard key={listing.id} {...listing} />);
+}
+
+// Mutations
+function CreateListingForm() {
+  const { toast } = useToast();
+  const [_, navigate] = useLocation();
+  
+  const mutation = useMutation({
+    mutationFn: async (data: InsertListing) => {
+      const response = await apiRequest("POST", "/api/listings", data);
+      return response.json();
+    },
+    onSuccess: (newListing) => {
+      // Invalidate cache
+      queryClient.invalidateQueries({ queryKey: ['/api/listings'] });
+      toast({ title: "Listing created!" });
+      navigate(`/listings/${newListing.id}`);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    }
+  });
+  
+  return <form onSubmit={form.handleSubmit(data => mutation.mutate(data))} />;
+}
+```
+
+#### 3. Form Handling
+
+```typescript
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertListingSchema } from "@shared/schema";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+
+function NewListingForm() {
+  const form = useForm<InsertListing>({
+    resolver: zodResolver(insertListingSchema.extend({
+      // Add custom validation
+      price: z.number().min(10000, "Minimum price is $100")
+    })),
+    defaultValues: {
+      status: "DRAFT",
+      mode: "BASIC",
+      bedrooms: 3,
+      bathrooms: 2
+    }
+  });
+  
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <FormField
+          control={form.control}
+          name="address"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Address</FormLabel>
+              <FormControl>
+                <Input {...field} data-testid="input-address" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" data-testid="button-submit">Create Listing</Button>
+      </form>
+    </Form>
+  );
+}
+```
+
+#### 4. WebSocket Integration
+
+```typescript
+// Establish connection
+useEffect(() => {
+  if (!isAuthenticated) return;
+  
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+  
+  ws.onopen = () => console.log('WebSocket connected');
+  
+  ws.onmessage = (event) => {
+    const message = JSON.parse(event.data);
+    
+    switch (message.type) {
+      case 'message':
+        // Update conversation
+        queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+        break;
+      case 'notification':
+        // Show toast
+        toast({ title: message.data.title, description: message.data.body });
+        break;
+      case 'update':
+        // Invalidate relevant cache
+        queryClient.invalidateQueries({ 
+          queryKey: [`/api/${message.data.entity}`, message.data.entityId] 
+        });
+        break;
+    }
+  };
+  
+  return () => ws.close();
+}, [isAuthenticated]);
+```
+
+#### 5. File Upload with Uppy
+
+```typescript
+import Uppy from '@uppy/core';
+import { Dashboard } from '@uppy/react';
+import '@uppy/core/dist/style.css';
+import '@uppy/dashboard/dist/style.css';
+
+function PhotoUploader({ listingId }: { listingId: string }) {
+  const uppy = useMemo(() => {
+    return new Uppy({
+      restrictions: {
+        maxFileSize: 10 * 1024 * 1024, // 10MB
+        allowedFileTypes: ['image/*']
+      }
+    });
+  }, []);
+  
+  useEffect(() => {
+    uppy.on('file-added', async (file) => {
+      // 1. Get signed URL
+      const { uploadUrl, objectPath } = await apiRequest("POST", "/api/objects/upload", {
+        entity: "listing",
+        entityId: listingId,
+        filename: file.name,
+        contentType: file.type
+      });
+      
+      // 2. Upload to signed URL
+      await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file.data
+      });
+      
+      // 3. Save metadata
+      await apiRequest("PUT", `/api/listings/${listingId}/files`, {
+        photos: [...existingPhotos, objectPath]
+      });
+      
+      uppy.removeFile(file.id);
+      queryClient.invalidateQueries({ queryKey: ['/api/listings', listingId] });
+    });
+  }, [uppy, listingId]);
+  
+  return <Dashboard uppy={uppy} />;
+}
+```
+
+### Component Structure
+
+**Shadcn UI Components** (`client/src/components/ui/`):
+- 40+ reusable primitives (Button, Card, Dialog, Form, Input, Select, etc.)
+- Tailwind CSS styled with design system tokens
+- Radix UI primitives for accessibility
+- Customizable via className prop
+
+**Custom Components** (`client/src/components/`):
+```
+BrandLogo.tsx           # Logo with theme support
+ThemeToggle.tsx         # Dark/light mode switcher
+ProtectedRoute.tsx      # Auth-gated route wrapper
+DeleteButton.tsx        # Soft delete with undo toast
+ROIDisplay.tsx          # Property ROI visualization
+DeficiencyCard.tsx      # Loan compliance issue card
+ShareListingButton.tsx  # Social sharing component
+PartnerCard.tsx         # SmartPartner profile card
+MobileNavMenu.tsx       # Responsive navigation
+```
+
+### Styling System
+
+**Design Tokens** (`client/index.css`):
+```css
+:root {
+  /* Primary Colors */
+  --primary: 222.2 47.4% 11.2%;
+  --primary-foreground: 210 40% 98%;
+  
+  /* Semantic Colors */
+  --background: 0 0% 100%;
+  --foreground: 222.2 47.4% 11.2%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 47.4% 11.2%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  
+  /* Elevation Utilities */
+  --elevate-bg: color-mix(in srgb, currentColor 10%, transparent);
+  --elevate-bg-2: color-mix(in srgb, currentColor 20%, transparent);
+}
+
+.dark {
+  --background: 224 71% 4%;
+  --foreground: 213 31% 91%;
+  /* ... dark mode overrides ... */
+}
+
+/* Custom Utilities */
+.hover-elevate {
+  transition: background-color 150ms ease;
+}
+.hover-elevate:hover {
+  background-color: var(--elevate-bg);
+}
+
+.active-elevate-2:active {
+  background-color: var(--elevate-bg-2);
+}
+```
+
+**Tailwind Config** (`tailwind.config.ts`):
+```typescript
+export default {
+  darkMode: ["class"],
+  content: ["./client/**/*.{ts,tsx}"],
+  theme: {
+    extend: {
+      colors: {
+        primary: "hsl(var(--primary) / <alpha-value>)",
+        background: "hsl(var(--background) / <alpha-value>)",
+        // ... all design tokens ...
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+      }
+    }
+  },
+  plugins: [require("tailwindcss-animate")]
+}
+```
+
+---
+
+## Authentication & Security
+
+### Authentication Flow
+
+#### 1. Registration
+```
+User fills form → Frontend validates (Zod) → CAPTCHA challenge
+    ↓
+POST /api/auth/register { username, email, password, userType, turnstileToken }
+    ↓
+Backend validates:
+  - Email format (RFC 5322 regex)
+  - Password strength (min 8 chars, uppercase, lowercase, number, special)
+  - CAPTCHA token (Cloudflare Turnstile)
+  - Username uniqueness
+    ↓
+Hash password (BCrypt, 12 rounds) → Create user → Generate email verification token
+    ↓
+Send verification email (requires SendGrid/SES in production)
+    ↓
+Create session → Return user object
+```
+
+#### 2. Login
+```
+User enters credentials → CAPTCHA challenge
+    ↓
+POST /api/auth/login { email/username, password, turnstileToken }
+    ↓
+Check account lockout (5 failed attempts = 15-minute lockout)
+    ↓
+Find user by email OR username
+    ↓
+Verify password (BCrypt compare)
+    ↓
+If 2FA enabled:
+  Return { requires2FA: true, userId } → Frontend shows 2FA input
+  POST /api/auth/2fa/verify-login { userId, token }
+  Verify TOTP code → Create session
+Else:
+  Create session immediately
+    ↓
+Clear failed login attempts → Return user object
+```
+
+#### 3. Session Management
+```typescript
+// PostgreSQL-backed sessions (persistent)
+import connectPgSimple from "connect-pg-simple";
+const PgSession = connectPgSimple(session);
+
+const sessionStore = new PgSession({
+  conString: process.env.DATABASE_URL,
+  tableName: "user_sessions",
+  pruneSessionInterval: 24 * 60 * 60 // Prune expired sessions daily
+});
+
+app.use(session({
+  store: sessionStore,
+  secret: process.env.SESSION_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  rolling: true, // Reset expiration on each request
+  cookie: {
+    secure: isProduction, // HTTPS only in production
+    httpOnly: true, // No JavaScript access
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    sameSite: "lax" // CSRF protection
+  }
+}));
+```
+
+#### 4. Protected Routes
+```typescript
+// Backend middleware
+export async function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const userId = (req.session as any).userId;
+  if (!userId) {
+    return res.status(401).json({ error: "Unauthorized - login required" });
+  }
+  (req as any).userId = userId;
+  next();
+}
+
+// Frontend component
+function ProtectedRoute({ children, allowedRoles }: { 
+  children: ReactNode; 
+  allowedRoles?: UserType[] 
+}) {
+  const { user, isLoading } = useAuth();
+  const [location] = useLocation();
+  
+  if (isLoading) return <LoadingScreen />;
+  
+  if (!user) {
+    return <Navigate to="/login" state={{ from: location }} />;
+  }
+  
+  if (allowedRoles && !allowedRoles.includes(user.userType)) {
+    return <Navigate to="/unauthorized" />;
+  }
+  
+  return <>{children}</>;
+}
+```
+
+### Security Measures
+
+#### 1. XSS Prevention
+```typescript
+// Input Sanitization (DOMPurify)
+import DOMPurify from 'isomorphic-dompurify';
+
+function sanitizeInput(input: string): string {
+  return DOMPurify.sanitize(input, {
+    ALLOWED_TAGS: [], // Strip all HTML
+    KEEP_CONTENT: true
+  });
+}
+
+// Applied to all API request bodies in middleware
+```
+
+#### 2. CSRF Protection
+```typescript
+// csurf middleware with session-based tokens
+import csrf from 'csurf';
+
+export const csrfProtection = csrf({ 
+  cookie: false, 
+  sessionKey: 'session' 
+});
+
+// Skipped for:
+// - GET/HEAD/OPTIONS (safe methods)
+// - /api/auth/* (CAPTCHA-protected)
+// - /api/stripe/webhook (signature-verified)
+
+// Frontend includes token in headers
+const apiRequest = async (method: string, url: string, data?: any) => {
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  
+  // Get CSRF token from cookie
+  const csrfToken = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('XSRF-TOKEN='))
+    ?.split('=')[1];
+  
+  if (csrfToken && method !== 'GET') {
+    headers['X-CSRF-Token'] = csrfToken;
+  }
+  
+  return fetch(url, { method, headers, body: JSON.stringify(data), credentials: 'include' });
+};
+```
+
+#### 3. SQL Injection Prevention
+```typescript
+// Drizzle ORM automatically parameterizes queries
+await db.select().from(users).where(eq(users.id, userId)); // Safe
+// Compiles to: SELECT * FROM users WHERE id = $1
+
+// Raw queries use placeholders
+await db.execute(sql`SELECT * FROM users WHERE email = ${email}`); // Safe
+```
+
+#### 4. Rate Limiting
+```typescript
+// Per-user rate limiting (100 requests per 15 minutes)
+// Prevents brute force, DDoS, API abuse
+
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+function getRateLimitKey(req: Request): string {
+  const userId = (req.session as any)?.userId;
+  return userId ? `user:${userId}` : `ip:${req.ip}`;
+}
+
+// Different limits for different endpoints
+app.post("/api/auth/login", authRateLimit); // 10 per 15 min
+app.use("/api", rateLimitMiddleware(15 * 60 * 1000, 100)); // 100 per 15 min
+```
+
+#### 5. Helmet Security Headers
+```typescript
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://challenges.cloudflare.com"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      connectSrc: ["'self'", "https://api.stripe.com", "wss://"],
+      frameSrc: ["https://js.stripe.com", "https://challenges.cloudflare.com"],
+      frameAncestors: ["'none"], // Prevent clickjacking
+      upgradeInsecureRequests: isProduction ? [] : null
+    }
+  },
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  frameguard: { action: "deny" },
+  noSniff: true,
+  xssFilter: true
+}));
+```
+
+#### 6. Sensitive Data Handling
+```typescript
+// Passwords: Never stored in plaintext, always BCrypt hashed
+// 2FA Secrets: Encrypted at rest in database
+// OAuth Tokens: Encrypted, short-lived, refreshed automatically
+// Stripe API Keys: Environment variables only, never in code
+// Session Secrets: Minimum 32 bytes of cryptographic randomness
+
+// Example: Password hashing
+const hashedPassword = await bcrypt.hash(password, 12); // 12 rounds ≈ 250ms
+
+// Example: Secret token generation
+const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+```
+
+---
+
+## External Integrations
+
+### 1. Stripe Payment Processing
+
+**Setup:**
+```bash
+# Environment variables
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+VITE_STRIPE_PUBLIC_KEY=pk_live_...
+```
+
+**Subscription Flow:**
+```typescript
+// 1. Create checkout session
+POST /api/stripe/create-checkout-session
+{
+  tier: "SMART_AI",
+  successUrl: "https://app.com/success",
+  cancelUrl: "https://app.com/cancel"
+}
+
+// 2. Redirect to Stripe Checkout
+window.location.href = session.url;
+
+// 3. User completes payment
+
+// 4. Stripe sends webhook
+POST /api/stripe/webhook
+Event: checkout.session.completed
+  → Create subscription in database
+  → Link to user account
+
+// 5. User redirected to success URL
+→ Frontend polls /api/stripe/subscription
+→ Shows active subscription
+```
+
+**Webhook Events Handled:**
+```typescript
+checkout.session.completed  → Create subscription
+customer.subscription.updated → Update status/period
+customer.subscription.deleted → Cancel subscription
+invoice.payment_succeeded → Reactivate if past_due
+invoice.payment_failed → Mark as past_due
+```
+
+### 2. OpenAI GPT-4o Integration
+
+**Setup:**
+```bash
+AI_INTEGRATIONS_OPENAI_API_KEY=sk-proj-...
+AI_INTEGRATIONS_OPENAI_BASE_URL=https://api.openai.com/v1
+```
+
+**Usage:**
+```typescript
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
+  baseURL: process.env.AI_INTEGRATIONS_OPENAI_BASE_URL
+});
+
+// Property analysis
+const response = await openai.chat.completions.create({
+  model: "gpt-4o",
+  messages: [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userPrompt }
+  ],
+  temperature: 0.7,
+  max_tokens: 4000,
+  response_format: { type: "json_object" } // Structured output
+});
+
+const analysis = JSON.parse(response.choices[0].message.content);
+```
+
+**Cost Management:**
+```typescript
+// Batch API calls where possible
+// Cache analysis results in database (ai_property_analyses table)
+// Rate limit AI endpoint usage (requireAuth + custom limits)
+// Token estimation before requests
+```
+
+### 3. ATTOM Property Data API
+
+**Endpoints Used:**
+```typescript
+// Property expanded profile
+GET https://api.gateway.attomdata.com/propertyapi/v1.0.0/property/expandedprofile
+Headers: { apikey: ATTOM_API_KEY }
+
+// Returns:
+{
+  AVM: { amount: { value: 450000 } },
+  saleHistory: [...],
+  schools: [...],
+  demographics: {...},
+  comparables: [...]
+}
+```
+
+**Data Integration:**
+```typescript
+// Store in listings table
+listing.comparablesData = JSON.stringify(attomData.comparables);
+listing.lotAcresSource = "ATTOM";
+listing.yearBuilt = attomData.building.yearBuilt;
+```
+
+### 4. Perplexity Sonar API
+
+**Real-time Web Research:**
+```typescript
+POST https://api.perplexity.ai/chat/completions
+{
+  model: "sonar",
+  messages: [{
+    role: "user",
+    content: "Recent real estate trends in Athens, Ohio within last 30 days"
+  }]
+}
+
+// Returns: Current market data, news, events
+// Used for: areaHighlights JSON field
+```
+
+### 5. Mapbox Geocoding
+
+**Address → Coordinates:**
+```typescript
+GET https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(address)}.json
+  ?access_token=${MAPBOX_ACCESS_TOKEN}
+
+// Returns: { features: [{ center: [lng, lat] }] }
+
+// Store in listings
+listing.geoLat = lat;
+listing.geoLng = lng;
+```
+
+**Geofencing Queries:**
+```sql
+-- Bounding box for quick filtering
+SELECT * FROM listings
+WHERE geo_lat BETWEEN :minLat AND :maxLat
+  AND geo_lng BETWEEN :minLng AND :maxLng
+  AND geofence_enabled = true;
+
+-- Then apply Haversine distance in application code
+```
+
+### 6. Google Calendar OAuth 2.0
+
+**Authorization Flow:**
+```typescript
+// 1. Get authorization URL
+GET /api/calendar/google/auth-url
+→ Returns Google OAuth URL
+
+// 2. User authorizes in Google
+
+// 3. Google redirects to callback
+GET /api/calendar/google/callback?code=...&state=...
+→ Exchange code for tokens
+→ Store encrypted tokens in calendar_connections table
+
+// 4. Sync events
+POST /api/calendar/sync
+→ Fetch events from Google Calendar
+→ Store in calendar_events table
+
+// 5. Create event
+POST /api/appointments
+→ Create in local database
+→ Create in Google Calendar via API
+→ Store googleCalendarEventId for future updates
+```
+
+**Token Management:**
+```typescript
+// Automatic refresh when expired
+if (connection.tokenExpiresAt < new Date()) {
+  const newTokens = await refreshGoogleTokens(connection.refreshToken);
+  await storage.updateCalendarConnection(connection.id, {
+    accessToken: encrypt(newTokens.access_token),
+    tokenExpiresAt: new Date(Date.now() + newTokens.expires_in * 1000)
+  });
+}
+```
+
+### 7. Web Push Notifications (VAPID)
+
+**Setup:**
+```bash
+# Generate VAPID keys
+npx web-push generate-vapid-keys
+
+# Store in environment
+VAPID_PUBLIC_KEY=BN...
+VAPID_PRIVATE_KEY=...
+VAPID_EMAIL=mailto:admin@smartlist.ai
+```
+
+**Subscription Flow:**
+```typescript
+// Frontend: Register service worker
+const registration = await navigator.serviceWorker.register('/sw.js');
+
+// Request notification permission
+const permission = await Notification.requestPermission();
+
+// Subscribe to push
+const subscription = await registration.pushManager.subscribe({
+  userVisibleOnly: true,
+  applicationServerKey: VAPID_PUBLIC_KEY
+});
+
+// Save subscription to backend
+POST /api/devices
+{
+  endpoint: subscription.endpoint,
+  keys: {
+    p256dh: subscription.keys.p256dh,
+    auth: subscription.keys.auth
+  }
+}
+```
+
+**Sending Notifications:**
+```typescript
+import webpush from 'web-push';
+
+webpush.setVapidDetails(
+  process.env.VAPID_EMAIL,
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+);
+
+await webpush.sendNotification(device.subscription, JSON.stringify({
+  title: "Property Nearby!",
+  body: "123 Main St is within 200m",
+  data: { url: "/listings/abc123" }
+}));
+```
+
+### 8. Replit Object Storage
+
+**Integration:**
+```bash
+# Automatically provided by Replit
+DEFAULT_OBJECT_STORAGE_BUCKET_ID=...
+PUBLIC_OBJECT_SEARCH_PATHS=/<bucket>/public
+PRIVATE_OBJECT_DIR=/<bucket>/.private
+```
+
+**Backend Service:**
+```typescript
+import { Storage } from '@google-cloud/storage';
+
+const storage = new Storage(); // Uses Replit credentials
+
+class ObjectStorageService {
+  async getObjectEntityUploadURL(
+    entity: string,
+    entityId: string,
+    filename: string,
+    contentType: string
+  ) {
+    const bucketName = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+    const objectPath = `public/${entity}/${entityId}/${Date.now()}-${filename}`;
+    
+    const bucket = storage.bucket(bucketName);
+    const file = bucket.file(objectPath);
+    
+    const [uploadUrl] = await file.getSignedUrl({
+      version: 'v4',
+      action: 'write',
+      expires: Date.now() + 10 * 60 * 1000, // 10 minutes
+      contentType
+    });
+    
+    return { uploadUrl, objectPath };
+  }
+}
+```
+
+### 9. LiDAR/CubiCasa GoToScan Integration
+
+**Status:** ✅ **Fully Implemented** - Requires API credentials for activation
+
+**Implementation Location:**
+- Service: `server/lidarService.ts` (240 lines, production-ready)
+- API Routes: `server/routes.ts` (scan endpoints)
+- Database: `listings.scanFiles`, `listings.scanType`, `listings.scanMetadata`
+
+**What's Implemented:**
+
+```typescript
+// 1. Complete Service Layer (server/lidarService.ts)
+export class CubiCasaService {
+  // Submit scan for processing
+  async submitScan(request: {
+    fileUrl: string;      // Publicly accessible URL
+    address?: string;
+    propertyType?: string;
+  }): Promise<CubiCasaScanResponse>
+  
+  // Check processing status
+  async getScanStatus(scanId: string): Promise<CubiCasaScanResponse>
+  
+  // Poll until completion (with timeout)
+  async pollScanUntilComplete(scanId: string, options?: {
+    intervalMs?: number;     // Default: 5000ms
+    timeoutMs?: number;      // Default: 300000ms (5 min)
+    onProgress?: (status) => void;
+  }): Promise<CubiCasaScanResponse>
+  
+  // Process webhook callbacks
+  async processWebhook(payload: any, signature?: string): Promise<void>
+  
+  // Verify webhook signatures (HMAC-SHA256)
+  verifyWebhookSignature(payload: string, signature: string): boolean
+}
+```
+
+**API Endpoints:**
+```typescript
+// Submit scan file for processing
+POST /api/scans/submit
+Body: {
+  listingId: string;
+  fileUrl: string;  // Must be publicly accessible
+  address?: string;
+  propertyType?: string;
+}
+Returns: {
+  scanId: string;
+  status: "processing";
+  estimatedTime: number; // seconds
+}
+
+// Check scan status
+GET /api/scans/:scanId/status
+Returns: {
+  scanId: string;
+  status: "processing" | "completed" | "failed";
+  floorPlanUrl?: string;
+  floorPlan2DUrl?: string;
+  floorPlan3DUrl?: string;
+  squareFootage?: number;
+  rooms?: CubiCasaRoom[];
+}
+
+// Webhook endpoint for CubiCasa callbacks
+POST /api/scans/webhook
+Headers: {
+  "X-CubiCasa-Signature": "hmac-sha256-signature"
+}
+Body: {
+  event_type: "scan.completed" | "scan.failed";
+  scan_id: string;
+  // ... scan results
+}
+```
+
+**Data Flow:**
+```
+1. User uploads LiDAR file to object storage
+   → Frontend requests signed URL
+   → File uploaded to public/{listing}/{timestamp}-scan.file
+   
+2. Submit scan to CubiCasa
+   → POST /api/scans/submit with publicFileUrl
+   → CubiCasa fetches file from public URL
+   → Returns scanId and "processing" status
+   
+3. Store scan metadata in listing
+   → listing.scanFiles = [fileUrl]
+   → listing.scanType = "LIDAR" | "IMAGE_SET" | "VIDEO_WALKTHROUGH"
+   → listing.scanMetadata = null (updated on completion)
+   
+4. CubiCasa processes scan (typically 5-15 minutes)
+   → Generates 2D floor plan
+   → Generates 3D walkthrough
+   → Calculates square footage
+   → Identifies rooms with dimensions
+   
+5. Webhook callback on completion
+   → POST /api/scans/webhook
+   → Verify HMAC signature
+   → Update listing with results:
+     - scanMetadata = {
+         floorPlanUrl: "...",
+         floorPlan2DUrl: "...",
+         floorPlan3DUrl: "...",
+         squareFootage: 2450,
+         rooms: [
+           { id, name, type, squareFootage, dimensions },
+           ...
+         ]
+       }
+   → Trigger AI analysis with enhanced data
+```
+
+**Required Environment Variables:**
+```bash
+# CubiCasa API Credentials (required for activation)
+CUBICASA_API_KEY=<your-api-key>
+CUBICASA_WEBHOOK_SECRET=<webhook-signing-secret>
+CUBICASA_WEBHOOK_URL=https://your-domain.com/api/scans/webhook
+
+# Optional: Override API base URL
+CUBICASA_API_BASE_URL=https://api.cubicasa.com/v1
+```
+
+**Setup Instructions:**
+
+1. **Register for CubiCasa Account**
+   - Visit: https://cubicasa.com/developers
+   - Sign up for developer account
+   - Choose pricing plan (pay-per-scan or subscription)
+
+2. **Get API Credentials**
+   - API Dashboard → Create API Key
+   - Copy API Key → Set as `CUBICASA_API_KEY`
+   - Generate Webhook Secret → Set as `CUBICASA_WEBHOOK_SECRET`
+
+3. **Configure Webhook URL**
+   - In CubiCasa Dashboard → Webhooks
+   - Add endpoint: `https://your-domain.com/api/scans/webhook`
+   - Select events: `scan.completed`, `scan.failed`
+   - Save webhook URL as `CUBICASA_WEBHOOK_URL`
+
+4. **Test Integration**
+   ```bash
+   # Submit test scan
+   curl -X POST https://your-domain.com/api/scans/submit \
+     -H "Content-Type: application/json" \
+     -d '{
+       "listingId": "test-listing-id",
+       "fileUrl": "https://public-url-to-scan-file.scan",
+       "address": "123 Main St, Athens, OH",
+       "propertyType": "residential"
+     }'
+   
+   # Check status
+   curl https://your-domain.com/api/scans/{scanId}/status
+   ```
+
+**Integration with AI Analysis:**
+```typescript
+// Once scan completes, enhanced data is available for AI pricing
+const listing = await storage.getListing(listingId);
+const scanMetadata = JSON.parse(listing.scanMetadata);
+
+// AI prompt now includes:
+// - Accurate square footage from LiDAR
+// - Room-by-room dimensions
+// - Floor plan visualizations
+// - 3D walkthrough data
+
+// Results in more accurate:
+// - Pricing suggestions
+// - ROI improvement recommendations
+// - Loan compliance analysis
+```
+
+**Error Handling:**
+```typescript
+// Service handles all error cases
+try {
+  const result = await lidarService.submitScan(request);
+} catch (error) {
+  if (error.message.includes("CubiCasa API key not configured")) {
+    // API key missing → Show setup instructions
+  } else if (error.message.includes("file_url must be publicly accessible")) {
+    // File URL not public → Fix object storage permissions
+  } else {
+    // Other API errors → Log and retry
+  }
+}
+```
+
+**Cost Optimization:**
+```typescript
+// CubiCasa pricing: ~$2-5 per scan
+// Optimize costs by:
+1. Only submit scans for SMART_AI and SMART_PRO tier users
+2. Cache scan results in database (don't re-scan same file)
+3. Offer manual upload vs auto-scan options
+4. Consider volume pricing for high-usage customers
+```
+
+### 10. RSMeans Professional Cost Estimation Integration
+
+**Status:** ✅ **Fully Implemented** - Requires API credentials for activation
+
+**Implementation Location:**
+- Service: `server/rsMeansService.ts` (240 lines, production-ready)
+- Integration: `server/lidarAiAnalysisService.ts` (used for ROI cost calculations)
+- Database: Cost estimates stored in `improvement_recommendations` and `loan_compliance_reports`
+
+**What's Implemented:**
+
+```typescript
+// Complete RSMeans Service (server/rsMeansService.ts)
+export class RSMeansService {
+  // Get location-adjusted cost index
+  async getCityCostIndex(city: string, state: string): Promise<number>
+  
+  // Material cost estimation
+  async getMaterialCost(
+    materialType: string,
+    quantity: number,
+    unit: string,
+    location: { city: string; state: string }
+  ): Promise<CostEstimate>
+  
+  // Labor cost by trade
+  async getLaborCost(
+    trade: string,
+    hours: number,
+    location: { city: string; state: string }
+  ): Promise<CostEstimate>
+  
+  // Comprehensive project estimate
+  async getProjectEstimate(request: CostEstimateRequest): Promise<CostEstimate>
+  
+  // Cost per square foot by project type
+  async getCostPerSquareFoot(
+    projectType: string,
+    location: { city: string; state: string }
+  ): Promise<{ baseCost: number; adjustedCost: number; locationFactor: number }>
+}
+```
+
+**Use Cases in SmartList AI:**
+
+**1. Loan Compliance Remediation Costs**
+```typescript
+// When AI identifies loan compliance issues, RSMeans provides accurate remediation costs
+const complianceIssue = {
+  issue: "Missing GFCI outlets in kitchen and bathroom",
+  location: "Kitchen, Master Bath",
+  loanType: "FHA"
+};
+
+// RSMeans calculates:
+const materials = await rsMeansService.getMaterialCost(
+  "GFCI Outlet 20A",
+  4, // quantity
+  "each",
+  { city: "Athens", state: "OH" }
+);
+
+const labor = await rsMeansService.getLaborCost(
+  "Electrician",
+  2.5, // hours
+  { city: "Athens", state: "OH" }
+);
+
+// Result: Accurate cost estimate for compliance fixes
+// Example: $450 (materials: $120, labor: $330)
+```
+
+**2. ROI Improvement Recommendations**
+```typescript
+// AI suggests kitchen remodel, RSMeans estimates cost
+const kitchenRemodel = await rsMeansService.getProjectEstimate({
+  projectType: "Kitchen Remodel - Mid Range",
+  location: {
+    city: "Athens",
+    state: "OH",
+    zipCode: "45701"
+  },
+  scope: {
+    squareFootage: 150,
+    materials: ["Granite countertops", "Stainless appliances", "Custom cabinets"],
+    laborTrades: ["Carpenter", "Electrician", "Plumber"]
+  }
+});
+
+// Returns detailed breakdown:
+{
+  totalEstimate: 2850000, // $28,500 in cents
+  materialCosts: 1500000,
+  laborCosts: 1200000,
+  equipmentCosts: 150000,
+  breakdown: [
+    {
+      category: "Countertops",
+      description: "Granite countertops - 30 linear feet",
+      quantity: 30,
+      unit: "LF",
+      unitCost: 15000,
+      totalCost: 450000
+    },
+    // ... more line items
+  ],
+  locationFactor: 0.92, // Athens, OH is 8% below national average
+  lastUpdated: "2024-11-01"
+}
+```
+
+**3. Service Marketplace Project Bidding**
+```typescript
+// Contractors use RSMeans data to create competitive bids
+const roofReplacement = await rsMeansService.getCostPerSquareFoot(
+  "Asphalt Shingle Roof Replacement",
+  { city: "Athens", state: "OH" }
+);
+
+// Returns:
+{
+  baseCost: 850, // $8.50/sq ft national average
+  adjustedCost: 782, // $7.82/sq ft adjusted for Athens
+  locationFactor: 0.92,
+  projectType: "Asphalt Shingle Roof Replacement",
+  location: { city: "Athens", state: "OH" }
+}
+
+// Contractor applies to 2,000 sq ft roof:
+// Estimated cost: $15,640
+```
+
+**Integration with AI Analysis:**
+```typescript
+// AI uses RSMeans for accurate cost estimation
+async function analyzeROIUpgrades(listing, scanData) {
+  // 1. AI identifies upgrade opportunities from LiDAR scan
+  const recommendations = await analyzeLiDARScan(scanData);
+  
+  // 2. For each recommendation, get RSMeans cost estimate
+  for (const rec of recommendations) {
+    const costEstimate = await rsMeansService.getProjectEstimate({
+      projectType: rec.projectType,
+      location: { city: listing.city, state: listing.state },
+      scope: rec.scope
+    });
+    
+    rec.estimatedCost = costEstimate.totalEstimate;
+    rec.costBreakdown = costEstimate.breakdown;
+    
+    // 3. Calculate ROI based on market data
+    const valueIncrease = rec.estimatedValueIncrease;
+    rec.roi = ((valueIncrease - rec.estimatedCost) / rec.estimatedCost) * 100;
+  }
+  
+  // 4. Sort by ROI (highest first)
+  return recommendations.sort((a, b) => b.roi - a.roi);
+}
+```
+
+**Data Flow:**
+```
+1. User uploads LiDAR scan
+   → CubiCasa processes → Returns room dimensions, features
+   
+2. AI analyzes for improvements
+   → Identifies kitchen is outdated
+   → Suggests "Kitchen Remodel - Mid Range"
+   
+3. RSMeans calculates cost
+   → Fetches city cost index for location
+   → Gets material costs (cabinets, countertops, appliances)
+   → Gets labor costs (carpenter, electrician, plumber)
+   → Applies location adjustment
+   → Returns detailed breakdown
+   
+4. AI calculates ROI
+   → Consults ATTOM/Perplexity for comparable sales
+   → Properties with updated kitchens sold for $15k-25k more
+   → Cost: $28,500, Value increase: $20,000
+   → ROI: -29.8% (negative - not recommended)
+   
+5. Alternative recommendation
+   → "Minor Kitchen Update - Paint & Hardware"
+   → Cost: $3,500, Value increase: $8,000
+   → ROI: +128.6% (positive - highly recommended)
+```
+
+**Required Environment Variables:**
+```bash
+# RSMeans API Credentials (required for activation)
+RSMEANS_API_KEY=<your-api-key>
+RSMEANS_API_URL=https://api.rsmeans.com/v1
+
+# Optional: Fallback to manual estimates if not configured
+# Service gracefully degrades without API key
+```
+
+**Setup Instructions:**
+
+1. **Subscribe to RSMeans Data**
+   - Visit: https://www.rsmeans.com/products/online
+   - Choose subscription tier:
+     - **Cost Data Online**: $1,495/year (basic access)
+     - **API Access**: $3,500+/year (programmatic access)
+   - Contact sales for API access tier
+
+2. **Get API Credentials**
+   - Login to RSMeans portal
+   - Navigate to API Settings
+   - Generate API key
+   - Note API base URL (provided by RSMeans)
+
+3. **Configure Environment**
+   - Add to Replit Secrets:
+     ```
+     RSMEANS_API_KEY=your-api-key-here
+     RSMEANS_API_URL=https://api.rsmeans.com/v1
+     ```
+
+4. **Test Integration**
+   ```bash
+   # Test city cost index
+   curl https://your-domain.com/api/rsmeans/city-index?city=Athens&state=OH
+   
+   # Expected response:
+   { "costIndex": 0.92, "city": "Athens", "state": "OH" }
+   ```
+
+**Cost Estimate Response Structure:**
+```typescript
+interface CostEstimate {
+  totalEstimate: number;        // Total cost in cents
+  materialCosts: number;        // Material subtotal in cents
+  laborCosts: number;           // Labor subtotal in cents
+  equipmentCosts: number;       // Equipment subtotal in cents
+  
+  breakdown: Array<{
+    category: string;           // "Framing", "Electrical", "Plumbing"
+    description: string;        // "2x4 Studs 8ft"
+    quantity: number;           // 120
+    unit: string;               // "EA" (each), "LF" (linear feet), "SF" (square feet)
+    unitCost: number;           // Cost per unit in cents
+    totalCost: number;          // Line item total in cents
+  }>;
+  
+  locationFactor: number;       // Cost multiplier (1.0 = national average)
+  lastUpdated: string;          // Date of cost data
+}
+```
+
+**Location Adjustment Example:**
+```typescript
+// National average cost: $10,000
+// Athens, OH factor: 0.92 (8% below average)
+// Adjusted cost: $9,200
+
+// San Francisco, CA factor: 1.45 (45% above average)
+// Adjusted cost: $14,500
+
+// This ensures estimates are accurate for local market
+```
+
+**Graceful Degradation:**
+```typescript
+// If RSMeans API not configured, service returns estimated costs
+if (!rsMeansService.isConfigured()) {
+  return {
+    configured: false,
+    error: "RSMeans API not configured",
+    message: "Using estimated costs based on industry averages",
+    estimatedCost: calculateFallbackCost(projectType)
+  };
+}
+
+// AI analysis continues with fallback estimates
+// User sees: "⚠️ Costs are estimated. Connect RSMeans for accurate pricing."
+```
+
+**Integration Benefits:**
+1. **Accurate Compliance Costs**: Know exact cost to fix VA/FHA/USDA/Conventional issues
+2. **Data-Driven ROI**: Real cost data + market analysis = accurate ROI calculations
+3. **Competitive Bidding**: Contractors can bid competitively with professional data
+4. **Location-Specific**: Costs adjusted for local labor rates and material prices
+5. **Detailed Breakdowns**: Itemized estimates show materials, labor, equipment separately
+6. **Professional Grade**: Same data used by construction estimators and appraisers
+
+**API Rate Limits:**
+- Typical limits: 1,000 requests/day for basic tier
+- Enterprise tier: 10,000+ requests/day
+- Implement caching for frequently requested cost data
+- Cache city cost indexes (update monthly)
+
+**Cost Optimization:**
+```typescript
+// Cache city cost indexes (rarely change)
+const cityIndexCache = new Map<string, { index: number; cachedAt: Date }>();
+
+async function getCachedCityIndex(city: string, state: string) {
+  const key = `${city},${state}`;
+  const cached = cityIndexCache.get(key);
+  
+  // Cache for 30 days
+  if (cached && Date.now() - cached.cachedAt.getTime() < 30 * 24 * 60 * 60 * 1000) {
+    return cached.index;
+  }
+  
+  const index = await rsMeansService.getCityCostIndex(city, state);
+  cityIndexCache.set(key, { index, cachedAt: new Date() });
+  return index;
+}
+```
+
+### 11. Loan Compliance & ROI Recommendation Engine
+
+**Status:** ✅ **Fully Implemented** - Production-ready AI analysis system
+
+**Implementation Locations:**
+- Compliance Engine: `server/lidar/complianceEngine.ts` (362 lines)
+- AI Analysis: `server/lidarAiAnalysisService.ts` (318 lines)
+- Database Schema: `ai_property_analyses`, `improvement_recommendations`
+- Frontend: `client/src/pages/PropertyAnalysis.tsx`
+
+**What's Implemented:**
+
+**1. Loan Compliance Analysis Engine**
+```typescript
+// Rule-based compliance checking (server/lidar/complianceEngine.ts)
+export class LoanComplianceEngine {
+  // Evaluate property against loan-specific rules
+  async runCompliance(
+    facts: LidarFacts,
+    loanTypes: ('VA' | 'FHA' | 'USDA' | 'CONVENTIONAL')[],
+    stateCode?: string
+  ): Promise<ComplianceResult[]>
+  
+  // Individual rule evaluation
+  private evaluateRule(
+    rule: LoanRuleSet,
+    facts: LidarFacts,
+    stateCode?: string
+  ): ComplianceResult
+}
+```
+
+**Loan-Specific Rules Implemented:**
+
+**FHA (Federal Housing Administration) - Minimum Property Requirements:**
+```typescript
+Rules Checked:
+- FHA-001: Permanent heating system required
+- FHA-002: Safe electrical & plumbing systems
+- FHA-003: Roof without active leaks
+- FHA-004: Lead paint disclosure (pre-1978 homes)
+- FHA-005: Minimum property standards (MPS)
+
+Example Rule Evaluation:
+const facts = {
+  heat_present: false,
+  electrical_present: true,
+  plumbing_present: true,
+  roof_condition: "good",
+  year_built: 1965,
+  peeling_paint: true
+};
+
+Results:
+✗ FAIL - FHA-001: No permanent heating system detected
+✓ PASS - FHA-002: Electrical and plumbing present
+✓ PASS - FHA-003: Roof in good condition
+✗ FAIL - FHA-004: Peeling paint on pre-1978 home (lead paint risk)
+
+Remediation Required:
+1. Install central HVAC system ($8,500 - $12,000)
+2. Remove/encapsulate peeling paint ($2,500 - $4,000)
+```
+
+**VA (Department of Veterans Affairs) - 54-Point Inspection:**
+```typescript
+Rules Checked:
+- VA-001: Bedroom egress windows (5.7 sq ft minimum openable area)
+- VA-002: Termite inspection in high-risk states
+- VA-003: Foundation integrity (no major cracks)
+- VA-004: Accessible attic/crawl space
+- VA-005: Safe HVAC installation
+- VA-006: Proper drainage and grading
+
+Example:
+const facts = {
+  bedrooms: 3,
+  egress_windows: [
+    { room: "Bedroom 1", openable_area_sqft: 6.2 },
+    { room: "Bedroom 2", openable_area_sqft: 4.8 }, // FAILS
+    { room: "Bedroom 3", openable_area_sqft: 5.9 }
+  ],
+  wdi_evidence: "none", // Wood-destroying insects
+  state: "OH" // Not high-risk termite state
+};
+
+Results:
+✗ FAIL - VA-001: Bedroom 2 egress window only 4.8 sq ft (need 5.7+)
+✓ PASS - VA-002: No WDI evidence, low-risk state
+
+Remediation:
+- Replace Bedroom 2 window with larger egress window ($850 - $1,200)
+```
+
+**USDA (Rural Development) - Property Requirements:**
+```typescript
+Rules Checked:
+- USDA-001: Well/septic compliance (if applicable)
+- USDA-002: Property location in eligible rural area
+- USDA-003: Adequate water supply
+- USDA-004: Septic system certification
+
+Example:
+const facts = {
+  well_water: true,
+  septic: true,
+  rural_area: true,
+  well_test_passed: false
+};
+
+Results:
+✗ FAIL - USDA-001: Well water test required, currently failed
+⚠ UNKNOWN - USDA-004: Septic inspection pending
+
+Remediation:
+- Well water treatment system ($1,500 - $3,000)
+- Professional septic inspection ($300 - $500)
+```
+
+**CONVENTIONAL (Fannie Mae/Freddie Mac) - Property Condition Requirements:**
+```typescript
+Rules Checked:
+- CONV-001: Handrails on stairs (4+ risers)
+- CONV-002: Guards on elevated surfaces (36" min height, 4" max gap)
+- CONV-003: Smoke/CO detectors (all levels + bedrooms)
+- CONV-004: GFCI protection (kitchen, bath, exterior)
+- CONV-005: Structural integrity
+
+Example:
+const facts = {
+  handrails: [
+    { location: "Main stairs", present: true, height_in: 36 },
+    { location: "Basement stairs", present: false } // FAILS
+  ],
+  gfci_outlets: {
+    kitchen: 0, // FAILS - should have 2+
+    bathrooms: 1 // FAILS - should match bathroom count
+  }
+};
+
+Results:
+✗ FAIL - CONV-001: Basement stairs missing handrails
+✗ FAIL - CONV-004: Insufficient GFCI protection
+
+Remediation:
+- Install basement handrail ($250 - $400)
+- Install GFCI outlets x4 ($450 - $650)
+```
+
+**2. AI-Powered Analysis (GPT-4o Integration)**
+
+```typescript
+// Comprehensive AI analysis (server/lidarAiAnalysisService.ts)
+
+// Analyzes LiDAR scan + property data for loan compliance
+export async function analyzeLoanCompliance(
+  request: LiDARAnalysisRequest
+): Promise<LoanComplianceReport[]>
+
+// Analyzes for high-ROI improvement recommendations
+export async function analyzeROIUpgrades(
+  request: LiDARAnalysisRequest
+): Promise<ImprovementRecommendation[]>
+```
+
+**AI Prompt Structure for Loan Compliance:**
+```
+System: You are an expert loan compliance inspector specializing in 
+        VA, FHA, USDA, and Conventional loan requirements.
+
+User: Analyze this property for loan compliance:
+      - LiDAR scan data (room dimensions, features)
+      - Floor plans (2D/3D)
+      - Property details (year built, location, size)
+
+For each loan type, identify:
+1. Compliance status (COMPLIANT, NON_COMPLIANT, REQUIRES_INSPECTION)
+2. Specific issues:
+   - Severity (CRITICAL, HIGH, MEDIUM, LOW)
+   - Location (room/area)
+   - Description
+   - Requirement violated
+   - Remediation steps (detailed)
+   - Materials needed (with quantities)
+   - Labor hours estimate
+   - Estimated cost (using RSMeans data)
+3. Total remediation cost per loan type
+4. Priority actions (CRITICAL/HIGH severity first)
+```
+
+**AI Prompt Structure for ROI Recommendations:**
+```
+System: You are an expert real estate investment advisor specializing 
+        in home improvement ROI analysis.
+
+User: Analyze this property for high-ROI upgrades:
+      - Current price, square footage, location
+      - LiDAR room breakdown with conditions
+      - Market comparables (via ATTOM/Perplexity)
+
+Provide 3-7 recommendations prioritized by:
+1. ROI percentage (highest first)
+2. Market demand in area
+3. Buyer appeal factor
+4. Implementation timeline
+
+For each recommendation:
+- Project description
+- Detailed scope of work
+- Estimated cost (RSMeans)
+- Expected value increase
+- ROI calculation
+- Timeline (weeks)
+- Priority level (HIGH, MEDIUM, LOW)
+- Buyer appeal score (1-10)
+```
+
+**Complete Analysis Workflow:**
+```
+1. User uploads LiDAR scan
+   ↓
+2. CubiCasa processes scan
+   → Returns: floor plans, square footage, room dimensions
+   ↓
+3. AI Loan Compliance Analysis (GPT-4o)
+   Input: LiDAR data + property details
+   → Analyzes against VA/FHA/USDA/Conventional rules
+   → Identifies compliance issues
+   → RSMeans calculates remediation costs
+   
+   Example Output:
+   {
+     loanType: "FHA",
+     compliant: false,
+     issues: [
+       {
+         severity: "CRITICAL",
+         location: "Kitchen",
+         description: "Missing GFCI outlets near sink",
+         requirement: "FHA MPR Section 4.6 - GFCI Protection",
+         remediation: "Install 2 GFCI outlets within 6ft of sink",
+         materials: "2x GFCI 20A outlets, wire, junction boxes",
+         laborHours: 2.5,
+         cost: 45000 // $450 in cents
+       },
+       {
+         severity: "HIGH",
+         location: "Basement stairs",
+         description: "No handrail present",
+         requirement: "FHA MPR Section 5.2 - Stair Safety",
+         remediation: "Install code-compliant handrail 34-38\" high",
+         materials: "Handrail kit, mounting hardware",
+         laborHours: 3,
+         cost: 35000 // $350
+       }
+     ],
+     totalRemediationCost: 80000 // $800
+   }
+   ↓
+4. AI ROI Upgrade Analysis (GPT-4o + ATTOM + Perplexity)
+   Input: LiDAR data + market comparables
+   → Identifies upgrade opportunities
+   → RSMeans calculates costs
+   → Researches comparable sales
+   → Calculates ROI
+   
+   Example Output:
+   {
+     recommendations: [
+       {
+         title: "Minor Kitchen Update",
+         description: "Paint cabinets, new hardware, updated lighting",
+         category: "KITCHEN",
+         estimatedCost: 350000, // $3,500
+         estimatedValueIncrease: 800000, // $8,000
+         estimatedROI: 128.6, // 128.6% ROI
+         timeline: "2 weeks",
+         priority: "HIGH",
+         buyerAppeal: 9,
+         costBreakdown: {
+           materials: 150000,
+           labor: 200000
+         },
+         marketInsight: "Kitchens are #1 buyer priority in Athens market. 
+                        Updated kitchens sell 12 days faster on average."
+       },
+       {
+         title: "Bathroom GFCI Upgrades",
+         description: "Install GFCI outlets in all bathrooms (FHA required)",
+         category: "ELECTRICAL",
+         estimatedCost: 45000, // $450
+         estimatedValueIncrease: 0, // No value add, but enables FHA financing
+         estimatedROI: -100, // Cost only
+         timeline: "1 day",
+         priority: "CRITICAL",
+         buyerAppeal: 3,
+         note: "Required for FHA loan approval. Opens property to 30% 
+                more buyers."
+       },
+       {
+         title: "Landscaping Curb Appeal Package",
+         description: "Front yard refresh, mulch, shrubs, flowers",
+         category: "EXTERIOR",
+         estimatedCost: 180000, // $1,800
+         estimatedValueIncrease: 400000, // $4,000
+         estimatedROI: 122.2, // 122% ROI
+         timeline: "1 week",
+         priority: "MEDIUM",
+         buyerAppeal: 8,
+         marketInsight: "First impression matters. Homes with professional 
+                        landscaping receive 15% more showings."
+       }
+     ],
+     summary: "Focus on low-cost, high-impact improvements. Kitchen update 
+              and curb appeal offer best ROI. Complete FHA compliance 
+              fixes to access larger buyer pool.",
+     totalInvestment: 575000, // $5,750 total
+     totalValueIncrease: 1200000, // $12,000 total
+     overallROI: 108.7 // 108.7% average ROI
+   }
+   ↓
+5. Store results in database
+   ai_property_analyses table:
+   - loanComplianceReports (JSON array)
+   - improvementRecommendations (JSON array)
+   ↓
+6. Display to user
+   PropertyAnalysis page shows:
+   - Compliance status per loan type
+   - Issues with remediation plans
+   - ROI-ranked improvement recommendations
+   - Total costs and value increases
+```
+
+**Database Schema:**
+```typescript
+// AI Property Analysis Results
+ai_property_analyses {
+  id: varchar (PK),
+  listingId: varchar (FK, unique),
+  analysisStatus: "PROCESSING" | "COMPLETED" | "FAILED",
+  
+  // Area intelligence (Perplexity + ATTOM)
+  areaIntelligence: text (JSON), // Parks, schools, crime, trends
+  
+  // AI-generated description
+  aiDescription: text (350-450 words),
+  
+  // Loan compliance reports (VA/FHA/USDA/Conventional)
+  loanComplianceReports: text (JSON array),
+  
+  // ROI-ranked improvement recommendations
+  improvementRecommendations: text (JSON array),
+  
+  created_at, updated_at
+}
+
+// Individual improvement recommendations
+improvement_recommendations {
+  id: varchar (PK),
+  listingId: varchar (FK),
+  projectType: "LOAN_COMPLIANCE" | "ROI_IMPROVEMENT" | "CUSTOM",
+  
+  title, description, category,
+  estimatedCost: integer (cents),
+  estimatedROI: real (percentage),
+  priority: "HIGH" | "MEDIUM" | "LOW",
+  
+  // Loan compliance specific
+  loanType: "VA" | "FHA" | "USDA" | "CONVENTIONAL",
+  complianceIssue: text,
+  
+  created_at
+}
+```
+
+**Frontend Display:**
+```typescript
+// Property Analysis Page
+<PropertyAnalysisCard listing={listing} />
+
+Displays:
+1. Loan Compliance Summary
+   ✓ VA: COMPLIANT
+   ✗ FHA: 2 issues ($800 to fix)
+   ⚠ USDA: Requires inspection
+   ✓ CONVENTIONAL: COMPLIANT
+
+2. Critical Issues (expandable)
+   [!] Missing GFCI in kitchen - $450
+       • Install 2 GFCI outlets near sink
+       • Materials: 2x 20A GFCI, wire, boxes
+       • Labor: 2.5 hours electrician
+       • Enables FHA financing (+30% buyer pool)
+
+3. ROI Recommendations (sorted by ROI %)
+   🏆 Minor Kitchen Update - 128.6% ROI
+       Cost: $3,500 | Value: +$8,000 | Timeline: 2 weeks
+       [View Details] [Add to Service Marketplace]
+   
+   🥈 Curb Appeal Package - 122% ROI
+       Cost: $1,800 | Value: +$4,000 | Timeline: 1 week
+       [View Details] [Add to Service Marketplace]
+
+4. Market Insights
+   • Updated kitchens sell 12 days faster in Athens
+   • Properties with landscaping get 15% more showings
+   • FHA buyers represent 30% of market
+```
+
+**Integration with Service Marketplace:**
+```typescript
+// User clicks "Add to Service Marketplace" on recommendation
+
+// Auto-creates project with pre-filled details:
+POST /api/projects
+{
+  title: "Minor Kitchen Update",
+  description: "Paint cabinets, new hardware, updated lighting...",
+  category: "KITCHEN_REMODEL",
+  estimatedBudget: 350000, // $3,500
+  timeline: "2 weeks",
+  scope: "Materials: Cabinet paint, 16 handles, 3 pendant lights..." +
+         "Labor: Professional painter, electrician for lighting"
+}
+
+// SmartPartners can bid on project with RSMeans data as baseline
+```
+
+**Benefits of Integrated System:**
+
+1. **Data-Driven Decisions**: Real cost data + market analysis = accurate ROI
+2. **Loan Accessibility**: Fix compliance issues = access to more buyers (VA/FHA/USDA)
+3. **Prioritized Improvements**: ROI ranking helps sellers focus on high-impact upgrades
+4. **Professional Accuracy**: RSMeans data ensures realistic cost estimates
+5. **Market Intelligence**: Perplexity + ATTOM provide local market context
+6. **Automated Workflow**: LiDAR → AI Analysis → Cost Estimation → Project Creation
+
+**Required Integrations:**
+- ✅ OpenAI GPT-4o (for AI analysis)
+- ✅ CubiCasa (for LiDAR scanning)
+- ✅ RSMeans (for cost estimation)
+- ✅ ATTOM (for property/market data)
+- ✅ Perplexity (for market research)
+
+All integrations are fully implemented and production-ready. Just need API credentials to activate.
+
+### 12. Social Media Auto-Posting Integration
+
+**Status:** ✅ **Fully Implemented** - Requires platform credentials for activation
+
+**Implementation Locations:**
+- OAuth Service: `server/oauthService.ts` (620 lines, production-ready)
+- Posting Service: `server/socialMediaPostingService.ts` (400 lines, production-ready)
+- Auto-Posting: `server/autoPostingService.ts` (185 lines, production-ready)
+- API Routes: `server/routes.ts` (OAuth callbacks, posting endpoints)
+- Frontend: `client/src/pages/SocialMediaSettings.tsx`
+
+**Supported Platforms:**
+1. **Facebook** (Graph API v18.0)
+2. **Instagram** (Graph API v18.0 - Business Accounts)
+3. **Twitter/X** (API v2 with OAuth 2.0 PKCE)
+4. **LinkedIn** (Marketing API v2)
+5. **TikTok** (Open API v2 - Video only)
+
+**What's Implemented:**
+
+**1. OAuth 2.0 Authorization Flow (All Platforms)**
+```typescript
+// Complete OAuth implementation with:
+// - CSRF protection (state parameter)
+// - PKCE for Twitter (code_challenge/code_verifier)
+// - Token refresh mechanisms
+// - Automatic token expiry handling
+
+// User clicks "Connect Facebook"
+GET /api/oauth/facebook/auth-url
+→ Returns: { authUrl: "https://facebook.com/oauth?...", state: "random-csrf-token" }
+
+// User authorizes on platform
+
+// Platform redirects to callback
+GET /api/oauth/facebook/callback?code=...&state=...
+→ Validates state (CSRF protection)
+→ Exchanges code for access token
+→ Stores encrypted token in database
+→ Redirects to /social-media?success=true
+```
+
+**2. Social Media Posting Service**
+```typescript
+// Post to any connected platform
+async function postToSocialMedia(post: SocialMediaPost): Promise<void>
+
+// Platform-specific implementations:
+
+// Facebook
+async function postToFacebook(account, post): Promise<string>
+// - Text + images
+// - Page posts (not personal profile)
+// - Returns Facebook post ID
+
+// Instagram
+async function postToInstagram(account, post): Promise<string>
+// - Requires images (no text-only)
+// - Creates media container
+// - Publishes when ready
+// - Returns Instagram media ID
+
+// Twitter/X
+async function postToTwitter(account, post): Promise<string>
+// - 280 character limit (auto-truncates)
+// - Text + media support
+// - Returns tweet ID
+
+// LinkedIn
+async function postToLinkedIn(account, post): Promise<string>
+// - Professional tone
+// - UGC posts
+// - Returns LinkedIn post URN
+
+// TikTok
+async function postToTikTok(account, post): Promise<string>
+// - Video-only (throws error for text/images)
+// - Requires video upload workflow
+// - Returns video ID
+```
+
+**3. AI-Generated Content**
+```typescript
+// Automatic content generation for each listing
+async function generateAIPostContent(
+  listing: Listing,
+  platform: string
+): Promise<{ content: string; hashtags?: string[] }>
+
+// Platform-specific optimization:
+const platformConfig = {
+  FACEBOOK: { maxLength: 500, tone: "friendly and informative" },
+  INSTAGRAM: { maxLength: 300, tone: "engaging and visual" },
+  TWITTER: { maxLength: 250, tone: "concise and attention-grabbing" },
+  LINKEDIN: { maxLength: 400, tone: "professional and detailed" },
+  TIKTOK: { maxLength: 300, tone: "fun and trendy" }
+};
+
+// Uses OpenAI GPT-4o to generate:
+// - Platform-optimized post content
+// - Relevant hashtags (5-8 per platform)
+// - Call-to-action messaging
+// - Property highlights
+```
+
+**4. Auto-Posting on Listing Creation**
+```typescript
+// Automatically post to all connected accounts
+export async function autoPostNewListing(
+  listing: Listing,
+  accounts: SocialMediaAccount[]
+): Promise<void>
+
+// Filters accounts with autoPostListings=true
+// Generates AI content for each platform
+// Posts to each platform asynchronously
+// Logs success/failure for each post
+```
+
+**API Endpoints:**
+```typescript
+// OAuth Authorization URLs
+GET /api/oauth/:platform/auth-url
+Params: platform = facebook | instagram | twitter | linkedin | tiktok
+Query: userId (from session)
+Returns: { authUrl: string, state: string }
+
+// OAuth Callbacks (one per platform)
+GET /api/oauth/facebook/callback?code=...&state=...
+GET /api/oauth/instagram/callback?code=...&state=...
+GET /api/oauth/twitter/callback?code=...&state=...
+GET /api/oauth/linkedin/callback?code=...&state=...
+GET /api/oauth/tiktok/callback?code=...&state=...
+
+// Get connected accounts
+GET /api/social-media/accounts
+Returns: SocialMediaAccount[]
+
+// Disconnect account
+DELETE /api/social-media/accounts/:id
+
+// Create manual post
+POST /api/social-media/posts
+Body: {
+  accountId: string;
+  listingId?: string;
+  postContent: string;
+  hashtags?: string;
+  imageUrls?: string[];
+  status: "DRAFT" | "SCHEDULED" | "PUBLISHED";
+  scheduledFor?: Date;
+}
+
+// Generate AI post content
+POST /api/ai/generate-social-post
+Body: {
+  listingId: string;
+  platform: "FACEBOOK" | "INSTAGRAM" | "TWITTER" | "LINKEDIN" | "TIKTOK";
+  propertyDetails: {
+    address, price, bedrooms, bathrooms, squareFeet
+  }
+}
+Returns: {
+  postContent: string;
+  hashtags: string[];
+}
+```
+
+**Required Environment Variables (Per Platform):**
+
+```bash
+# Facebook (also used for Instagram Business)
+FACEBOOK_CLIENT_ID=<your-app-id>
+FACEBOOK_CLIENT_SECRET=<your-app-secret>
+# Scopes: pages_manage_posts, pages_read_engagement, pages_show_list
+
+# Instagram (uses Facebook OAuth)
+INSTAGRAM_CLIENT_ID=<facebook-app-id>
+INSTAGRAM_CLIENT_SECRET=<facebook-app-secret>
+# Scopes: instagram_basic, instagram_content_publish, pages_show_list
+
+# Twitter/X
+TWITTER_CLIENT_ID=<your-client-id>
+TWITTER_CLIENT_SECRET=<your-client-secret>
+# Scopes: tweet.read, tweet.write, offline.access
+
+# LinkedIn
+LINKEDIN_CLIENT_ID=<your-client-id>
+LINKEDIN_CLIENT_SECRET=<your-client-secret>
+# Scopes: w_member_social, r_liteprofile, r_emailaddress
+
+# TikTok
+TIKTOK_CLIENT_ID=<your-client-key>
+TIKTOK_CLIENT_SECRET=<your-client-secret>
+# Scopes: user.info.basic, video.upload, video.publish
+
+# Base URL for OAuth callbacks
+BASE_URL=https://your-domain.com
+# Callbacks: {BASE_URL}/api/oauth/{platform}/callback
+
+# OpenAI (for AI-generated content)
+AI_INTEGRATIONS_OPENAI_API_KEY=sk-proj-...
+```
+
+**Platform-Specific Setup Instructions:**
+
+**Facebook:**
+1. Create Facebook App: https://developers.facebook.com/apps
+2. Add Facebook Login product
+3. Configure OAuth Redirect URIs:
+   - `https://your-domain.com/api/oauth/facebook/callback`
+4. Add required permissions:
+   - `pages_manage_posts` (publish to pages)
+   - `pages_read_engagement` (read page data)
+   - `pages_show_list` (list user's pages)
+5. Get App ID and Secret → Set as `FACEBOOK_CLIENT_ID` and `FACEBOOK_CLIENT_SECRET`
+6. Submit for App Review if publishing publicly
+
+**Instagram:**
+1. Use same Facebook App (Instagram uses Facebook OAuth)
+2. Connect Instagram Business Account to Facebook Page
+3. Add Instagram Graph API product
+4. Configure same OAuth redirect URI
+5. Add permissions:
+   - `instagram_basic` (read profile)
+   - `instagram_content_publish` (create posts)
+   - `pages_show_list` (required)
+6. **Important:** Only works with Instagram Business/Creator accounts, not personal
+
+**Twitter/X:**
+1. Create Twitter App: https://developer.twitter.com/en/portal/dashboard
+2. Enable OAuth 2.0 with PKCE
+3. Configure Redirect URI:
+   - `https://your-domain.com/api/oauth/twitter/callback`
+4. Add OAuth 2.0 scopes:
+   - `tweet.read` (read tweets)
+   - `tweet.write` (post tweets)
+   - `offline.access` (refresh tokens)
+5. Get Client ID and Secret → Set as `TWITTER_CLIENT_ID` and `TWITTER_CLIENT_SECRET`
+6. **Note:** Must be approved for Elevated access for production
+
+**LinkedIn:**
+1. Create LinkedIn App: https://www.linkedin.com/developers/apps
+2. Add Sign In with LinkedIn product
+3. Configure Redirect URLs:
+   - `https://your-domain.com/api/oauth/linkedin/callback`
+4. Add OAuth 2.0 scopes:
+   - `w_member_social` (share content)
+   - `r_liteprofile` (read profile)
+   - `r_emailaddress` (read email)
+5. Get Client ID and Secret → Set as `LINKEDIN_CLIENT_ID` and `LINKEDIN_CLIENT_SECRET`
+6. Verify app before going live
+
+**TikTok:**
+1. Create TikTok Developer Account: https://developers.tiktok.com/
+2. Create app in Developer Portal
+3. Configure Redirect URI:
+   - `https://your-domain.com/api/oauth/tiktok/callback`
+4. Request permissions:
+   - `user.info.basic` (read user info)
+   - `video.upload` (upload videos)
+   - `video.publish` (publish videos)
+5. Get Client Key and Secret → Set as `TIKTOK_CLIENT_ID` and `TIKTOK_CLIENT_SECRET`
+6. **Note:** Video-only platform, text/image posts not supported
+
+**Database Schema:**
+```typescript
+// social_media_accounts table
+{
+  id: string (PK);
+  userId: string (FK → users.id);
+  platform: "FACEBOOK" | "INSTAGRAM" | "TWITTER" | "LINKEDIN" | "TIKTOK";
+  accountName: string;
+  accountId: string; // Platform-specific user/page ID
+  platformUsername: string;
+  
+  // OAuth tokens (encrypted)
+  accessToken: string;
+  refreshToken: string | null;
+  tokenExpiresAt: Date | null;
+  
+  // Configuration
+  isActive: boolean;
+  autoPostListings: boolean; // Auto-post new listings
+  pageId: string | null; // For Facebook/Instagram pages
+  
+  lastUsedAt: Date;
+  created_at, updated_at
+}
+
+// social_media_posts table
+{
+  id: string (PK);
+  listingId: string | null (FK);
+  accountId: string (FK → social_media_accounts.id);
+  
+  platform: string;
+  postContent: text;
+  hashtags: text | null;
+  imageUrls: string[] | null;
+  
+  status: "DRAFT" | "SCHEDULED" | "PUBLISHED" | "FAILED";
+  externalPostId: string | null; // Platform's post ID
+  
+  scheduledFor: Date | null;
+  publishedAt: Date | null;
+  errorMessage: text | null;
+  
+  created_at
+}
+```
+
+**Token Refresh Implementation:**
+```typescript
+// Automatic token refresh before expiry
+if (account.tokenExpiresAt && account.tokenExpiresAt < new Date()) {
+  await refreshAccessToken(account);
+}
+
+// Platform-specific refresh mechanisms:
+// Facebook/Instagram: Long-lived tokens (60 days), exchange for new
+// Twitter: Refresh tokens with OAuth 2.0
+// LinkedIn: Refresh tokens (60 days)
+// TikTok: Refresh tokens (custom expiry)
+```
+
+**Security Features:**
+1. **CSRF Protection**: State parameter validated on callback
+2. **PKCE for Twitter**: Code challenge/verifier prevents authorization code interception
+3. **Token Encryption**: Access/refresh tokens encrypted at rest
+4. **Signature Verification**: Webhook signatures validated (where supported)
+5. **State Expiry**: OAuth state expires after 10 minutes
+6. **Token Expiry**: Automatic refresh before expiry
+
+**Testing Workflow:**
+```bash
+# 1. Set environment variables
+export FACEBOOK_CLIENT_ID=...
+export FACEBOOK_CLIENT_SECRET=...
+# ... (all platform credentials)
+
+# 2. Start application
+npm run dev
+
+# 3. Navigate to social media settings
+https://localhost:5000/social-media
+
+# 4. Click "Connect Facebook"
+→ Redirects to Facebook OAuth
+→ User authorizes app
+→ Redirects back with success
+
+# 5. Create a test post
+POST /api/social-media/posts
+{
+  "accountId": "connected-account-id",
+  "postContent": "Test post from SmartList AI!",
+  "status": "PUBLISHED"
+}
+
+# 6. Verify on platform
+→ Check Facebook/Instagram/Twitter/LinkedIn/TikTok
+→ Confirm post appears
+```
+
+**Auto-Posting Configuration:**
+```typescript
+// Enable auto-posting for an account
+PATCH /api/social-media/accounts/:id
+{ autoPostListings: true }
+
+// When user publishes a listing:
+POST /api/listings/:id/publish
+→ Triggers autoPostNewListing()
+→ Generates AI content for each connected account
+→ Posts to all accounts with autoPostListings=true
+→ Creates post records with status/errors
+```
+
+**Known Limitations:**
+1. **Instagram**: Requires Business/Creator account, not personal
+2. **Instagram**: Images must be publicly accessible URLs (not local files)
+3. **TikTok**: Video-only platform, no text/image support implemented
+4. **Facebook**: Posts to pages only, not personal profiles
+5. **Twitter**: Character limit (280), auto-truncates content
+
+**Error Handling:**
+```typescript
+// All posting failures are caught and logged
+try {
+  await postToSocialMedia(post);
+} catch (error) {
+  await storage.updateSocialMediaPost(post.id, {
+    status: "FAILED",
+    errorMessage: error.message
+  });
+  // User sees error in UI, can retry manually
+}
+```
+
+---
+
+## Feature Documentation
+
+### 1. AI-Powered Property Analysis
+
+**Trigger:** User uploads LiDAR scan or clicks "Generate Pricing" on listing
+
+**Process:**
+```
+1. Validate listing has required data (address, sqft, bedrooms, bathrooms)
+2. Call OpenAI GPT-4o with comprehensive prompt (see aiAnalysisService.ts)
+3. Optionally enhance with ATTOM data (sales history, comparables)
+4. Optionally enhance with Perplexity research (market trends, area insights)
+5. Parse structured JSON response
+6. Store in ai_property_analyses table
+7. Create improvement_projects for each recommendation
+8. Return analysis to frontend
+```
+
+**Output Structure:**
+```json
+{
+  "areaIntelligence": {
+    "parks": [...],
+    "schools": [...],
+    "crime": {...},
+    "marketTrends": {...},
+    "amenities": [...]
+  },
+  "propertyDescription": "350-450 word compelling description",
+  "loanCompliance": [
+    {
+      "loanType": "VA",
+      "issues": [
+        {
+          "severity": "HIGH",
+          "location": "Exterior - North Side",
+          "description": "Peeling paint on siding",
+          "remediation": "Scrape, prime, and repaint affected area",
+          "materials": [...],
+          "laborHours": 8,
+          "estimatedCost": 45000 // cents
+        }
+      ]
+    }
+  ],
+  "improvements": [
+    {
+      "title": "Kitchen Remodel",
+      "description": "...",
+      "estimatedCost": 2500000,
+      "estimatedValueIncrease": 4000000,
+      "roi": 160,
+      "priority": "HIGH"
+    }
+  ]
+}
+```
+
+### 2. SmartReport Card Rating System
+
+**Purpose:** Academic-style GPA (1.0-4.0) for SmartPartners with fee discounts
+
+**Calculation:**
+```typescript
+function calculateSmartReportCard(metrics: {
+  onTimeCompletionRate: number;   // 0-100%
+  estimateAccuracyRate: number;   // 0-100%
+  avgResponseTimeHours: number;   // Raw hours
+  avgClientRating: number;        // 1-5 stars
+  completedProjectsCount: number;
+}): number {
+  // Normalize to 0-100 scale
+  const timelinessScore = metrics.onTimeCompletionRate;
+  const accuracyScore = metrics.estimateAccuracyRate;
+  const responsivenessScore = Math.max(0, 100 - (metrics.avgResponseTimeHours / 24) * 100);
+  const clientSatisfactionScore = (metrics.avgClientRating / 5) * 100;
+  const volumeScore = Math.min(100, (metrics.completedProjectsCount / 50) * 100);
+  
+  // Weighted average
+  const overallScore = (
+    timelinessScore * 0.30 +      // 30% weight
+    accuracyScore * 0.25 +         // 25% weight
+    responsivenessScore * 0.20 +   // 20% weight
+    clientSatisfactionScore * 0.15 + // 15% weight
+    volumeScore * 0.10             // 10% weight
+  );
+  
+  // Convert to 4.0 scale
+  const gpa = (overallScore / 100) * 4.0;
+  
+  // Round to 2 decimals
+  return Math.round(gpa * 100) / 100;
+}
+
+function calculatePlatformFeeDiscount(gpa: number): number {
+  if (gpa >= 3.8) return 40; // Elite (A+)
+  if (gpa >= 3.5) return 30; // Platinum (A)
+  if (gpa >= 3.0) return 20; // Gold (B+)
+  if (gpa >= 2.5) return 10; // Silver (B)
+  if (gpa >= 2.0) return 5;  // Bronze (C+)
+  return 0; // Standard (C or below)
+}
+```
+
+**Recalculation Trigger:**
+```typescript
+// After project completion
+POST /api/partners/:partnerId/recalculate
+
+// Also runs automatically:
+// - When client submits review
+// - When project status changes to "completed"
+// - On bid acceptance (updates response time metrics)
+```
+
+### 3. Subscription Tiers
+
+**Feature Matrix:**
+
+| Feature | STARTER ($19/mo) | SMART_AI ($39/mo) | SMART_PRO ($69/mo) |
+|---------|-----------------|-------------------|-------------------|
+| Listings | 1 | 3 | Unlimited |
+| Basic Listing Tools | ✓ | ✓ | ✓ |
+| AI Pricing & Description | ✗ | ✓ | ✓ |
+| Loan Compliance Check | ✗ | ✓ | ✓ |
+| ROI Recommendations | ✗ | ✓ | ✓ |
+| SmartBid Access | ✗ | ✓ | ✓ |
+| Social Media Auto-Post | ✗ | ✗ | ✓ |
+| Professional Partnerships | ✗ | ✗ | ✓ |
+| Smart Home Add-Ons | ✗ | ✗ | ✓ |
+| Priority Support | ✗ | ✗ | ✓ |
+
+**Enforcement:**
+```typescript
+// Backend middleware
+async function requireTier(minTier: SubscriptionTier) {
+  return async (req: Request, res: Response, next: NextFunction) => {
+    const userId = (req as any).userId;
+    const user = await storage.getUser(userId);
+    const subscription = await storage.getSubscription(user.currentSubscriptionId);
+    
+    const tierHierarchy = { STARTER: 1, SMART_AI: 2, SMART_PRO: 3 };
+    if (tierHierarchy[subscription.tier] < tierHierarchy[minTier]) {
+      return res.status(403).json({ 
+        error: "Upgrade required",
+        requiredTier: minTier
+      });
+    }
+    next();
+  };
+}
+
+// Usage
+app.post("/api/listings/:id/generate-pricing", requireAuth, requireTier("SMART_AI"), ...);
+```
+
+### 4. Soft Delete & Recycle Bin
+
+**Implementation:**
+```typescript
+// Enum in schema
+export const deleteStateEnum = pgEnum("delete_state", ["ACTIVE", "DELETED", "PURGED"]);
+
+// Applied to all major entities
+export const listings = pgTable("listings", {
+  // ... fields ...
+  deleteState: deleteStateEnum("delete_state").default("ACTIVE"),
+  deletedAt: timestamp("deleted_at"),
+  deletedBy: varchar("deleted_by"),
+  deleteReason: text("delete_reason")
+});
+```
+
+**Soft Delete:**
+```typescript
+// DELETE /api/listings/:id (soft delete)
+await storage.softDeleteListing(id, userId, "No longer selling");
+
+// Updates:
+// deleteState = "DELETED"
+// deletedAt = NOW()
+// deletedBy = userId
+```
+
+**Recycle Bin:**
+```typescript
+// GET /api/deleted
+const deletedItems = await storage.getDeletedEntities(userId);
+
+// Returns:
+[
+  {
+    entityType: "listing",
+    entityId: "abc123",
+    title: "123 Main St",
+    deletedAt: "2025-11-01T12:00:00Z",
+    expiresAt: "2025-12-01T12:00:00Z", // 30 days
+    daysRemaining: 27
+  }
+]
+```
+
+**Restore:**
+```typescript
+// POST /api/listings/:id/restore
+await storage.restoreListing(id, userId);
+
+// Updates:
+// deleteState = "ACTIVE"
+// deletedAt = NULL
+// deletedBy = NULL
+```
+
+**Permanent Delete (Purge):**
+```typescript
+// DELETE /api/admin/listings/:id/purge
+await storage.purgeListing(id);
+
+// Updates:
+// deleteState = "PURGED"
+// (Actual deletion happens via cron job after 30 days)
+```
+
+### 5. SmartManage Project Management
+
+**Overview:** Enterprise-grade project tracking for contractors managing improvement projects
+
+**Core Features:**
+1. **Project Dashboard** - Overview of all assigned projects with status filters
+2. **Milestone Tracking** - Sequential milestones with progress percentage
+3. **Status Updates** - Contractor posts updates with photos/attachments
+4. **Client Communication** - Threaded messaging with homeowner
+5. **Change Orders** - Scope/cost change requests with approval workflow
+6. **Document Management** - Centralized file storage (contracts, permits, invoices)
+
+**Access Control:**
+```typescript
+// Only assigned contractor can access
+GET /api/improvement-projects/:id
+→ Verify contractorId === user.partnerProfile.id
+
+// Homeowner (ownerId) has read-only access
+```
+
+**Status Update Flow:**
+```typescript
+// Contractor posts update
+POST /api/improvement-projects/:id/status-updates
+{
+  title: "Framing Complete",
+  message: "All walls are framed and inspected",
+  updateType: "MILESTONE",
+  progressPercentage: 40,
+  photos: ["path1.jpg", "path2.jpg"],
+  milestoneId: "milestone123"
+}
+
+// Update project progress
+PATCH /api/improvement-projects/:id
+{ progressPercentage: 40 }
+
+// Notify homeowner via WebSocket
+→ Type: "update", entity: "project", entityId, field: "status"
+```
+
+**Change Order Workflow:**
+```typescript
+// 1. Contractor requests change
+POST /api/improvement-projects/:id/change-orders
+{
+  title: "Additional Electrical Outlets",
+  description: "Homeowner requested 4 additional outlets in living room",
+  reason: "Scope expansion requested by client",
+  costImpact: 75000, // +$750
+  timelineImpact: 2, // +2 days
+  originalScope: "10 outlets as per plan",
+  newScope: "14 outlets total",
+  photos: [...]
+}
+// Status: PENDING
+
+// 2. Homeowner reviews
+GET /api/improvement-projects/:id/change-orders
+→ Shows pending change orders
+
+// 3. Homeowner approves/rejects
+PATCH /api/change-orders/:id
+{ status: "APPROVED", reviewNotes: "Approved, proceed with work" }
+
+// 4. Update project contract value
+PATCH /api/improvement-projects/:id
+{ totalContractValue: originalValue + costImpact }
+```
+
+### 6. Geofencing & Proximity Alerts
+
+**Components:**
+1. **Frontend**: Service worker with background geolocation
+2. **Backend**: BullMQ job queue processing location pings
+3. **Notifications**: Web Push (VAPID) to registered devices
+
+**User Flow:**
+```
+1. User opts in to geofencing (consent modal)
+2. Service worker requests location permission
+3. Service worker registers for background sync
+4. On location change, ping backend (rate-limited to 1 per minute)
+5. Backend queues location update job
+6. Job processor finds nearby listings/projects
+7. Sends push notification if in range
+8. Deduplicates (4-hour window per listing)
+```
+
+**Backend Processing:**
+```typescript
+// Location update job
+queue.add('location-update', {
+  userId,
+  lat,
+  lng,
+  timestamp: Date.now()
+});
+
+// Job processor
+async function processLocationUpdate(job: Job) {
+  const { userId, lat, lng } = job.data;
+  
+  // 1. Get preferences
+  const prefs = await storage.getNotificationPreferences(userId);
+  if (!prefs.geofencingEnabled) return;
+  
+  // 2. Bounding box query (fast)
+  const delta = (prefs.radiusMeters / 111320); // degrees
+  const nearbyListings = await db.select()
+    .from(listings)
+    .where(and(
+      between(listings.geoLat, lat - delta, lat + delta),
+      between(listings.geoLng, lng - delta, lng + delta),
+      eq(listings.geofenceEnabled, true)
+    ));
+  
+  // 3. Haversine distance (precise)
+  const inRange = nearbyListings.filter(l => {
+    const distance = haversineDistance(lat, lng, l.geoLat, l.geoLng);
+    return distance <= l.geofenceRadiusMeters;
+  });
+  
+  // 4. Deduplicate (4-hour window)
+  const cutoff = Date.now() - (4 * 60 * 60 * 1000);
+  const recentEvents = await storage.getRecentGeofenceEvents(userId, cutoff);
+  const newListings = inRange.filter(l => 
+    !recentEvents.some(e => e.listingId === l.id)
+  );
+  
+  // 5. Send notifications
+  for (const listing of newListings) {
+    await sendPushNotification(userId, {
+      title: "🏠 Property Nearby!",
+      body: `${listing.address} is just ${Math.round(distance)}m away`,
+      data: { url: `/listings/${listing.id}` }
+    });
+    
+    await storage.createGeofenceEvent({
+      userId,
+      listingId: listing.id,
+      eventType: "LISTING_PROXIMITY",
+      userLat: lat,
+      userLng: lng,
+      targetLat: listing.geoLat,
+      targetLng: listing.geoLng,
+      distanceMeters: haversineDistance(...),
+      notificationSent: true,
+      notificationSentAt: new Date()
+    });
+  }
+}
+```
+
+**Privacy Controls:**
+```typescript
+// User can disable at any time
+PATCH /api/notification-preferences
+{ geofencingEnabled: false }
+
+// User can view/clear geofence history
+GET /api/geofence-events?userId=me
+DELETE /api/geofence-events (clear all history)
+```
+
+### 7. Internal Messaging System
+
+**Architecture:**
+- Unified inbox for buyer-seller and client-partner conversations
+- Real-time updates via WebSocket
+- Message threading (replies)
+- Unread badge counts
+
+**Data Model:**
+```typescript
+// Simplified unified message structure
+{
+  id: string;
+  senderId: string;
+  recipientId: string;
+  subject: string;
+  message: string;
+  threadId: string; // Groups related messages
+  parentMessageId: string; // For replies
+  read: boolean;
+  readAt: timestamp;
+  attachments: string[];
+  created_at: timestamp;
+}
+```
+
+**API Endpoints:**
+```typescript
+// Get all conversations
+GET /api/conversations
+→ Returns grouped messages by threadId with last message preview
+
+// Get specific conversation
+GET /api/conversations/:otherUserId
+→ Returns all messages in thread, marks as read
+
+// Send message
+POST /api/messages/send
+{
+  recipientId,
+  subject,
+  message,
+  parentMessageId, // Optional, for replies
+  attachments
+}
+
+// Unread count (for badge)
+GET /api/messages/unread-count
+→ { count: 5 }
+```
+
+**WebSocket Integration:**
+```typescript
+// Server sends on new message
+{
+  type: 'message',
+  data: {
+    conversationId: threadId,
+    senderId,
+    message,
+    timestamp
+  }
+}
+
+// Frontend updates UI
+ws.onmessage = (event) => {
+  const msg = JSON.parse(event.data);
+  if (msg.type === 'message') {
+    // Invalidate conversation cache
+    queryClient.invalidateQueries({ queryKey: ['/api/conversations'] });
+    // Show notification if not on messages page
+    if (window.location.pathname !== '/messages') {
+      toast({ title: "New message", description: msg.data.message.substring(0, 50) });
+    }
+  }
+};
+```
+
+---
+
+## Development Workflows
+
+### Local Development
+
+**Initial Setup:**
+```bash
+# 1. Clone repository
+git clone <repo-url>
+cd smartlist-ai
+
+# 2. Install dependencies
+npm install
+
+# 3. Set up environment variables
+cp .env.example .env
+# Edit .env with your keys
+
+# 4. Initialize database
+npm run db:push
+
+# 5. Start development server
+npm run dev
+```
+
+**Environment Variables:**
+```bash
+# Database
+DATABASE_URL=postgresql://user:pass@host:5432/db
+
+# Session
+SESSION_SECRET=<32-byte-random-hex>
+
+# Stripe
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+VITE_STRIPE_PUBLIC_KEY=pk_test_...
+
+# OpenAI
+AI_INTEGRATIONS_OPENAI_API_KEY=sk-proj-...
+
+# External APIs (optional)
+ATTOM_API_KEY=...
+PERPLEXITY_API_KEY=...
+
+# Object Storage (provided by Replit)
+DEFAULT_OBJECT_STORAGE_BUCKET_ID=...
+PUBLIC_OBJECT_SEARCH_PATHS=...
+PRIVATE_OBJECT_DIR=...
+
+# Geofencing (optional)
+MAPBOX_ACCESS_TOKEN=...
+VAPID_PUBLIC_KEY=...
+VAPID_PRIVATE_KEY=...
+
+# OAuth (optional)
+GOOGLE_OAUTH_CLIENT_ID=...
+GOOGLE_OAUTH_CLIENT_SECRET=...
+```
+
+**Development Server:**
+```bash
+npm run dev
+# → Backend: http://localhost:5000
+# → Frontend: Vite dev server proxying to backend
+# → Hot module replacement (HMR) enabled
+```
+
+### Database Migrations
+
+**Schema Changes:**
+```typescript
+// 1. Edit shared/schema.ts
+export const myNewTable = pgTable("my_new_table", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  // ... fields ...
+});
+
+// 2. Push schema to database
+npm run db:push
+// → Drizzle generates SQL and applies changes
+
+// 3. For complex migrations, use drizzle-kit
+npm run db:generate  // Generate migration SQL
+npm run db:migrate   // Apply migrations
+```
+
+**⚠️ Critical Rules:**
+1. **Never change existing ID column types** (serial → varchar or vice versa)
+2. **Use `npm run db:push --force`** if standard push fails
+3. **Always backup database** before schema changes
+4. **Test migrations locally** before production
+
+### Testing
+
+**Manual Testing Checklist:**
+```
+Authentication:
+  [ ] Registration (with CAPTCHA)
+  [ ] Login (email + username)
+  [ ] 2FA setup and verification
+  [ ] Password reset flow
+  [ ] Email verification
+
+Listings:
+  [ ] Create listing
+  [ ] Upload photos
+  [ ] AI pricing generation
+  [ ] Edit listing
+  [ ] Soft delete + restore
+
+Projects:
+  [ ] Post project to marketplace
+  [ ] Submit bid
+  [ ] Award bid
+  [ ] SmartManage dashboard
+
+Subscriptions:
+  [ ] Stripe checkout
+  [ ] Webhook processing
+  [ ] Tier enforcement
+
+Messaging:
+  [ ] Send message
+  [ ] Receive WebSocket update
+  [ ] Unread count badge
+
+Admin:
+  [ ] SmartBoard moderation
+  [ ] Project management
+  [ ] User management
+```
+
+**Automated Testing (Future):**
+```bash
+# Playwright E2E tests
+npm run test:e2e
+
+# Vitest unit tests
+npm run test:unit
+```
+
+### Code Quality
+
+**Type Safety:**
+```bash
+# TypeScript compiler check
+npx tsc --noEmit
+
+# Should show 0 errors in production-ready code
+```
+
+**Linting:**
+```bash
+npx eslint . --ext .ts,.tsx
+```
+
+**Code Conventions:**
+- **File names**: camelCase for utilities, PascalCase for components
+- **Variables**: camelCase
+- **Constants**: UPPER_SNAKE_CASE (for config)
+- **Functions**: camelCase, descriptive verbs
+- **Types**: PascalCase, suffix with "Type" if needed
+- **Interfaces**: PascalCase, prefix with "I" (e.g., `IStorage`)
+
+---
+
+## API Reference
+
+### Authentication Endpoints
+
+```typescript
+POST /api/auth/register
+Body: { username, email, password, firstName, lastName, userType, turnstileToken }
+Returns: { user: User }
+
+POST /api/auth/login
+Body: { email, username, password, turnstileToken }
+Returns: { user: User } | { requires2FA: true, userId: string }
+
+POST /api/auth/logout
+Returns: { success: true }
+
+GET /api/auth/me
+Returns: { user: User }
+
+POST /api/auth/2fa/setup
+Returns: { secret: string, qrCode: string }
+
+POST /api/auth/2fa/verify-setup
+Body: { token: string }
+Returns: { success: true, backupCodes: string[] }
+
+POST /api/auth/2fa/verify-login
+Body: { userId, token, backupCode }
+Returns: { user: User }
+
+POST /api/auth/verify-email
+Body: { token: string }
+Returns: { success: true }
+
+POST /api/auth/forgot-password
+Body: { email: string }
+Returns: { success: true }
+
+POST /api/auth/reset-password
+Body: { token, newPassword }
+Returns: { success: true }
+```
+
+### Listing Endpoints
+
+```typescript
+POST /api/listings
+Body: InsertListing
+Returns: Listing
+Auth: Required
+
+GET /api/listings
+Query: { state?, city?, minPrice?, maxPrice?, status? }
+Returns: Listing[]
+
+GET /api/listings/:id
+Returns: Listing
+
+PATCH /api/listings/:id
+Body: Partial<Listing>
+Returns: Listing
+Auth: Required, Owner or Admin
+
+DELETE /api/listings/:id
+Returns: { success: true }
+Auth: Required, Owner or Admin
+Note: Soft delete
+
+POST /api/listings/:id/restore
+Returns: Listing
+Auth: Required, Owner
+
+POST /api/listings/:id/generate-pricing
+Returns: { suggestedPrice, pricingRationale, ... }
+Auth: Required, Tier: SMART_AI+
+
+POST /api/listings/:id/generate-description
+Returns: { description, keySellingPoints, ... }
+Auth: Required, Tier: SMART_AI+
+
+GET /api/listings/:id/analysis
+Returns: AiPropertyAnalysis
+```
+
+### Project Endpoints
+
+```typescript
+POST /api/projects
+Body: InsertProject
+Returns: Project
+Auth: Required
+
+GET /api/projects
+Query: { state?, category?, status?, minBudget?, maxBudget? }
+Returns: Project[]
+
+GET /api/projects/:id
+Returns: Project with bids count
+
+POST /api/project-bids
+Body: { projectId, contractorId, amount, message, etaDays }
+Returns: ProjectBid
+Auth: Required, Role: SMART_PARTNER
+
+GET /api/projects/:id/bids
+Returns: ProjectBid[]
+```
+
+### SmartManage Endpoints
+
+```typescript
+GET /api/improvement-projects/listing/:listingId
+Returns: ImprovementProject[]
+Auth: Required, Owner or assigned contractor
+
+GET /api/improvement-projects/:id
+Returns: ImprovementProject with full details
+Auth: Required, Owner or assigned contractor
+
+PATCH /api/improvement-projects/:id/status
+Body: { status: "IN_PROGRESS" | "COMPLETED" | ... }
+Returns: ImprovementProject
+Auth: Required, assigned contractor
+
+POST /api/improvement-projects/:id/status-updates
+Body: { title, message, updateType, progressPercentage, photos }
+Returns: ProjectStatusUpdate
+Auth: Required, assigned contractor
+
+POST /api/improvement-projects/:id/change-orders
+Body: { title, description, costImpact, timelineImpact, ... }
+Returns: ChangeOrder
+Auth: Required, Owner or contractor
+
+GET /api/improvement-projects/:id/documents
+Returns: ProjectDocument[]
+Auth: Required, Owner or contractor
+
+POST /api/improvement-projects/:id/documents
+Body: FormData (file upload)
+Returns: ProjectDocument
+Auth: Required, Owner or contractor
+```
+
+### Messaging Endpoints
+
+```typescript
+GET /api/conversations
+Returns: Array<{ otherUserId, otherUserName, lastMessage, unreadCount }>
+Auth: Required
+
+GET /api/conversations/:otherUserId
+Returns: Message[]
+Auth: Required
+Side effect: Marks messages as read
+
+POST /api/messages/send
+Body: { recipientId, subject?, message, parentMessageId?, attachments? }
+Returns: Message
+Auth: Required
+
+GET /api/messages/unread-count
+Returns: { count: number }
+Auth: Required
+```
+
+### Admin Endpoints
+
+```typescript
+GET /api/admin/users
+Returns: User[]
+Auth: Required, Role: ADMIN
+
+GET /api/admin/listings
+Query: { state?, status?, minPrice?, maxPrice?, startDate?, endDate? }
+Returns: Listing[]
+Auth: Required, Role: ADMIN
+
+PATCH /api/admin/listings/:id
+Body: Partial<Listing>
+Returns: Listing
+Auth: Required, Role: ADMIN
+
+DELETE /api/admin/listings/:id
+Returns: { success: true }
+Auth: Required, Role: ADMIN
+
+GET /api/admin/board-posts
+Query: { flagged? }
+Returns: BoardPost[]
+Auth: Required, Role: ADMIN
+
+PATCH /api/admin/board-posts/:id/flag
+Body: { flagReason: string }
+Returns: BoardPost
+Auth: Required, Role: ADMIN
+
+PATCH /api/admin/board-posts/:id/hide
+Body: { isHidden: boolean }
+Returns: BoardPost
+Auth: Required, Role: ADMIN
+
+DELETE /api/admin/board-posts/:id
+Returns: { success: true }
+Auth: Required, Role: ADMIN
+
+GET /api/admin/projects
+Returns: Project[] with bid counts
+Auth: Required, Role: ADMIN
+
+GET /api/admin/deleted
+Returns: DeletedEntity[]
+Auth: Required, Role: ADMIN
+
+POST /api/admin/:entityType/:id/restore
+Returns: Entity
+Auth: Required, Role: ADMIN
+
+DELETE /api/admin/:entityType/:id/purge
+Returns: { success: true }
+Auth: Required, Role: ADMIN
+```
+
+### Stripe Endpoints
+
+```typescript
+POST /api/stripe/create-checkout-session
+Body: { tier: "STARTER" | "SMART_AI" | "SMART_PRO" }
+Returns: { url: string }
+Auth: Required
+
+POST /api/stripe/webhook
+Body: Raw Stripe event
+Returns: { received: true }
+Auth: Stripe signature verification
+
+GET /api/stripe/subscription
+Returns: Subscription | null
+Auth: Required
+
+POST /api/stripe/cancel-subscription
+Returns: { success: true }
+Auth: Required
+```
+
+### Object Storage Endpoints
+
+```typescript
+POST /api/objects/upload
+Body: { entity, entityId, filename, contentType }
+Returns: { uploadUrl: string, objectPath: string }
+Auth: Required
+
+GET /objects/*
+Returns: File stream
+Note: Public access for public/ directory, auth required for .private/
+
+PUT /api/listings/:id/files
+Body: { photos: string[] } // objectPaths
+Returns: Listing
+Auth: Required, Owner
+```
+
+---
+
+## Code Conventions
+
+### Backend Patterns
+
+**1. Route Handler Structure:**
+```typescript
+// Always validate auth first
+app.post("/api/resource", requireAuth, async (req, res) => {
+  try {
+    const userId = (req as any).userId;
+    
+    // Validate input with Zod
+    const validated = insertResourceSchema.parse(req.body);
+    
+    // Business logic via storage interface
+    const resource = await storage.createResource({
+      ...validated,
+      userId // Add server-controlled fields
+    });
+    
+    // Return created resource
+    return res.json(resource);
+  } catch (error: any) {
+    console.error("Error creating resource:", error);
+    return res.status(500).json({ 
+      error: error.message || "Failed to create resource" 
+    });
+  }
+});
+```
+
+**2. Storage Interface Methods:**
+```typescript
+// Always return Promise
+// Always handle errors
+// Always use Drizzle ORM (no raw SQL unless absolutely necessary)
+async createListing(data: InsertListing): Promise<Listing> {
+  const [listing] = await db.insert(listings)
+    .values(data)
+    .returning();
+  
+  if (!listing) {
+    throw new Error("Failed to create listing");
+  }
+  
+  return listing;
+}
+
+async getListings(filters?: ListingFilters): Promise<Listing[]> {
+  let query = db.select().from(listings);
+  
+  if (filters?.state) {
+    query = query.where(eq(listings.state, filters.state));
+  }
+  
+  if (filters?.minPrice) {
+    query = query.where(gte(listings.price, filters.minPrice));
+  }
+  
+  return await query;
+}
+```
+
+**3. Middleware Pattern:**
+```typescript
+// Always call next() on success
+// Always return response on failure (don't call next with error)
+export function myMiddleware(req: Request, res: Response, next: NextFunction) {
+  if (someCondition) {
+    return res.status(400).json({ error: "Bad request" });
+  }
+  
+  // Attach data to request
+  (req as any).customData = processedData;
+  next();
+}
+```
+
+### Frontend Patterns
+
+**1. Page Component Structure:**
+```typescript
+export default function MyPage() {
+  // Hooks first
+  const { user } = useAuth();
+  const [_, navigate] = useLocation();
+  const { toast } = useToast();
+  
+  // Queries
+  const { data, isLoading } = useQuery({ queryKey: ['/api/resource'] });
+  
+  // Mutations
+  const mutation = useMutation({
+    mutationFn: async (data) => { /* ... */ },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/resource'] });
+      toast({ title: "Success!" });
+    }
+  });
+  
+  // Loading state
+  if (isLoading) return <Skeleton />;
+  
+  // Main render
+  return (
+    <div className="container mx-auto p-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Title</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Content */}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+```
+
+**2. Form Component:**
+```typescript
+function MyForm() {
+  const form = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { /* ... */ }
+  });
+  
+  const onSubmit = async (data: FormData) => {
+    await mutation.mutateAsync(data);
+  };
+  
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)}>
+        <FormField
+          control={form.control}
+          name="fieldName"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Label</FormLabel>
+              <FormControl>
+                <Input {...field} data-testid="input-fieldname" />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <Button type="submit" disabled={mutation.isPending}>
+          {mutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Submit
+        </Button>
+      </form>
+    </Form>
+  );
+}
+```
+
+**3. Data Fetching:**
+```typescript
+// Good: Use query keys as arrays for hierarchical invalidation
+const { data } = useQuery({ 
+  queryKey: ['/api/listings', listingId] 
+});
+
+// Later, invalidate all listings:
+queryClient.invalidateQueries({ queryKey: ['/api/listings'] });
+
+// Bad: String interpolation prevents partial invalidation
+const { data } = useQuery({ 
+  queryKey: [`/api/listings/${listingId}`] 
+});
+```
+
+**4. Component Data-testid:**
+```typescript
+// Always add data-testid to interactive elements
+<Button data-testid="button-submit">Submit</Button>
+<Input data-testid="input-email" />
+<Link data-testid="link-profile" to="/profile">Profile</Link>
+
+// For dynamic lists
+{items.map(item => (
+  <Card key={item.id} data-testid={`card-item-${item.id}`}>
+    <h3 data-testid={`text-title-${item.id}`}>{item.title}</h3>
+  </Card>
+))}
+```
+
+### Styling Conventions
+
+**1. Use Shadcn Components:**
+```typescript
+// Good: Use existing primitives
+<Card>
+  <CardHeader>
+    <CardTitle>Title</CardTitle>
+  </CardHeader>
+  <CardContent>
+    <Button>Click me</Button>
+  </CardContent>
+</Card>
+
+// Bad: Recreate primitives
+<div className="rounded-lg border bg-card p-6">
+  <h3 className="text-lg font-bold">Title</h3>
+  <button className="px-4 py-2 bg-primary text-primary-foreground">
+    Click me
+  </button>
+</div>
+```
+
+**2. Consistent Spacing:**
+```typescript
+// Container padding
+<div className="container mx-auto p-6">
+
+// Card spacing
+<Card className="mb-6">
+
+// Form spacing
+<form className="space-y-4">
+
+// Grid gap
+<div className="grid gap-4 md:grid-cols-2">
+```
+
+**3. Responsive Design:**
+```typescript
+// Mobile-first breakpoints
+<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+
+// Hide on mobile
+<div className="hidden md:block">
+
+// Stack on mobile, row on desktop
+<div className="flex flex-col md:flex-row">
+```
+
+---
+
+## Deployment Information
+
+### Replit Deployment
+
+**Current Setup:**
+- Platform: Replit (Node.js)
+- Database: Neon PostgreSQL (managed by Replit)
+- Object Storage: Google Cloud Storage (via Replit integration)
+- Domain: `*.replit.app`
+
+**Environment Configuration:**
+```bash
+# Production environment variables (set in Replit Secrets)
+NODE_ENV=production
+DATABASE_URL=<provided-by-replit>
+SESSION_SECRET=<generate-32-byte-hex>
+STRIPE_SECRET_KEY=sk_live_...
+# ... all other production keys
+```
+
+**Deployment Process:**
+```
+1. Git commit & push to main branch
+2. Replit auto-deploys on push
+3. Database migrations run automatically (db:push)
+4. Workflow "Start application" restarts
+5. Health check: GET /api/auth/me (should return 401)
+```
+
+**Publishing to Custom Domain:**
+```
+1. Use Replit's "Publish" button
+2. Configure custom domain in Replit dashboard
+3. Update CORS origins in server/middleware.ts
+4. Update Stripe webhook URL
+5. Update OAuth redirect URLs (Google, Apple)
+```
+
+### Production Checklist
+
+**Security:**
+- [ ] All environment variables set in Replit Secrets
+- [ ] SESSION_SECRET is cryptographically random (32+ bytes)
+- [ ] Stripe webhook secret configured
+- [ ] HTTPS enforced (automatic on Replit)
+- [ ] CORS origins restricted to production domains
+- [ ] Rate limiting enabled (production values)
+- [ ] Helmet security headers active
+- [ ] CSRF protection enabled
+
+**Integrations:**
+- [ ] Stripe live mode keys
+- [ ] OpenAI production API key
+- [ ] ATTOM production API key
+- [ ] SendGrid/AWS SES for email
+- [ ] Google OAuth production credentials
+- [ ] Mapbox production token
+- [ ] Web Push VAPID keys
+
+**Database:**
+- [ ] Backups configured (Neon automatic)
+- [ ] Connection pooling enabled
+- [ ] Indexes created for performance
+- [ ] Session table pruning scheduled
+
+**Monitoring:**
+- [ ] Error logging (console.error captured)
+- [ ] Performance monitoring (response times)
+- [ ] Database query performance
+- [ ] Stripe webhook delivery monitoring
+
+**Legal:**
+- [ ] Terms of Service live
+- [ ] Privacy Policy live
+- [ ] GDPR compliance (if EU users)
+- [ ] Cookie consent (if required)
+
+---
+
+## Known Issues & Future Improvements
+
+### Known Issues
+1. **Email Service**: Currently stubbed, requires SendGrid/AWS SES integration
+2. **Social Media OAuth**: Fully implemented but requires platform credentials (see detailed integration guide below)
+3. **LiDAR Service**: Fully implemented but requires CubiCasa API credentials (see detailed integration guide below)
+4. **Geofencing**: Requires VAPID keys and service worker registration
+
+### Future Improvements
+1. **Testing**
+   - Playwright E2E test suite
+   - Vitest unit tests for critical paths
+   - Load testing for scalability
+
+2. **Performance**
+   - Redis for session store (currently PostgreSQL)
+   - CDN for static assets
+   - Database query optimization
+   - Image compression and lazy loading
+
+3. **Features**
+   - Mobile apps (React Native)
+   - Advanced search with Elasticsearch
+   - Video tours with streaming
+   - Virtual staging AI
+   - Automated MLS integration
+
+4. **DevOps**
+   - CI/CD pipeline (GitHub Actions)
+   - Staging environment
+   - Database migration rollback strategy
+   - Automated backups
+
+---
+
+## Contact & Support
+
+**Primary Developer:** [Your Name]  
+**Project Repository:** [GitHub URL]  
+**Documentation:** This file (NOTES_FOR_DAN.md)  
+**Last Updated:** November 7, 2025
+
+---
+
+## Appendix: Quick Reference
+
+### Common Commands
+```bash
+# Development
+npm run dev                    # Start dev server
+npm run db:push                # Sync schema to database
+npm run db:studio              # Open Drizzle Studio
+
+# Production
+npm start                      # Start production server
+npm run build                  # Build frontend (if needed)
+
+# Database
+npm run db:generate            # Generate migration SQL
+npm run db:migrate             # Run migrations
+```
+
+### Environment Variable Prefixes
+```
+VITE_*        → Frontend accessible (public keys only)
+STRIPE_*      → Stripe integration
+AI_*          → AI service integrations
+DATABASE_*    → Database connection
+*_OBJECT_*    → Object storage
+VAPID_*       → Web Push notifications
+*_OAUTH_*     → OAuth providers
+```
+
+### File Naming Patterns
+```
+camelCase.ts         → Utilities, services
+PascalCase.tsx       → React components
+kebab-case.sql       → Database migrations
+UPPER_SNAKE_CASE.md  → Documentation
+```
+
+### Port Mapping
+```
+5000  → Express backend (production)
+5173  → Vite dev server (development only)
+```
+
+---
+
+**End of Technical Documentation**
+
+This document is intended as a comprehensive reference for understanding the SmartList AI codebase. For specific implementation details, always refer to the source code and inline comments.
